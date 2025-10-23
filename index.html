@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema de Inventario MINSAL</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🏥 Sistema de Inventario MINSAL</h1>
+            <p>Control de medicamentos e insumos hospitalarios</p>
+        </header>
+
+        <!-- Sección de carga -->
+        <section class="upload-section" id="uploadSection">
+            <h2>📁 Cargar Base de Datos</h2>
+            <p>Selecciona el archivo Excel con el inventario</p>
+            <input type="file" id="fileInput" accept=".xlsx,.xls">
+            <button onclick="cargarArchivo()">📥 Cargar Excel</button>
+        </section>
+
+        <!-- Dashboard (oculto hasta cargar Excel) -->
+        <section id="dashboard" style="display: none;">
+            
+            <!-- Botón para volver a cargar -->
+            <button onclick="location.reload()" class="btn-secondary">🔄 Cargar otro archivo</button>
+            
+            <h2>📊 Dashboard Principal</h2>
+            
+            <!-- Alertas -->
+            <div class="alertas-container">
+                <h3>⚠️ Alertas Críticas</h3>
+                <div id="listaAlertas">Cargando...</div>
+            </div>
+
+            <!-- Métricas -->
+            <div class="resumen-container">
+                <h3>📈 Resumen del Inventario</h3>
+                <div id="metricas" class="metricas-grid">Cargando...</div>
+            </div>
+
+            <!-- Acciones principales -->
+            <div class="acciones">
+                <h3>⚙️ Acciones</h3>
+                <button onclick="verCatalogo()">📋 Ver Catálogo</button>
+                <button onclick="verInventario()">📦 Ver Inventario</button>
+                <button onclick="mostrarFormularioCompra()">➕ Registrar Compra</button>
+                <button onclick="mostrarFormularioSalida()">➖ Registrar Salida</button>
+                <button onclick="verLibroDiario()">📖 Libro Diario</button>
+                <button onclick="guardarExcel()" class="btn-success">💾 Guardar Cambios</button>
+            </div>
+
+            <!-- Área de contenido dinámico -->
+            <div id="contenidoDinamico"></div>
+
+        </section>
+    </div>
+
+    <!-- SheetJS desde CDN -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Nuestros scripts -->
+    <script src="js/main.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/compras.js"></script>
+    <script src="js/salidas.js"></script>
+    <script src="js/reportes.js"></script>
+</body>
+</html>
