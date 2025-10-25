@@ -170,9 +170,11 @@ function calcularPEPS() {
 }
 
 // ============================================
-// APLICAR MÉTODO PEPS
+// APLICAR MÉTODO PEPS (VERSIÓN ROBUSTA)
 // ============================================
 function aplicarPEPS(codigoMed, cantidadSolicitada) {
+    console.log('🔄 Aplicando PEPS para:', codigoMed, 'Cantidad:', cantidadSolicitada);
+    
     // 1. Filtrar lotes disponibles del medicamento
     const lotesDisponibles = hojas.inventario
         .filter(lote => lote.Código_Med === codigoMed && lote.Cant_Actual > 0);
@@ -186,13 +188,61 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
     
     // 2. Ordenar por fecha de vencimiento (más antiguo primero - PEPS)
     lotesDisponibles.sort((a, b) => {
-        const fechaA = new Date(a.Fecha_Venc.split('/').reverse().join('-'));
-        const fechaB = new Date(b.Fecha_Venc.split('/').reverse().join('-'));
-        return fechaA - fechaB;
+        // Validar fechas
+        if (!a.Fecha_Venc || !b.Fecha_Venc) {
+            console.warn('Lote sin fecha de vencimiento:', a.Fecha_Venc ? b : a);
+            return 0;
+        }
+        
+        try {
+            let fechaA, fechaB;
+            
+            // Parsear fecha A
+            if (typeof a.Fecha_Venc === 'string') {
+                if (a.Fecha_Venc.includes('/')) {
+                    const partesA = a.Fecha_Venc.split('/');
+                    fechaA = new Date(partesA[2], partesA[1] - 1, partesA[0]);
+                } else {
+                    fechaA = new Date(a.Fecha_Venc);
+                }
+            } else {
+                fechaA = new Date(a.Fecha_Venc);
+            }
+            
+            // Parsear fecha B
+            if (typeof b.Fecha_Venc === 'string') {
+                if (b.Fecha_Venc.includes('/')) {
+                    const partesB = b.Fecha_Venc.split('/');
+                    fechaB = new Date(partesB[2], partesB[1] - 1, partesB[0]);
+                } else {
+                    fechaB = new Date(b.Fecha_Venc);
+                }
+            } else {
+                fechaB = new Date(b.Fecha_Venc);
+            }
+            
+            // Validar que las fechas sean válidas
+            if (isNaN(fechaA.getTime()) || isNaN(fechaB.getTime())) {
+                console.warn('Fecha inválida:', { fechaA, fechaB, loteA: a, loteB: b });
+                return 0;
+            }
+            
+            return fechaA - fechaB;
+            
+        } catch (error) {
+            console.error('Error al ordenar fechas:', error, { loteA: a, loteB: b });
+            return 0;
+        }
     });
     
+    console.log('✅ Lotes ordenados por PEPS:', lotesDisponibles.map(l => ({
+        lote: l.Num_Lote,
+        vence: l.Fecha_Venc,
+        cantidad: l.Cant_Actual
+    })));
+    
     // 3. Verificar stock suficiente
-    const stockTotal = lotesDisponibles.reduce((sum, lote) => sum + lote.Cant_Actual, 0);
+    const stockTotal = lotesDisponibles.reduce((sum, lote) => sum + (lote.Cant_Actual || 0), 0);
     
     if (stockTotal < cantidadSolicitada) {
         return {
@@ -214,15 +264,17 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
             idLote: lote.ID_Lote,
             numLote: lote.Num_Lote,
             cantidad: aTomar,
-            costoUnit: lote.Costo_Unit,
-            costoTotal: aTomar * lote.Costo_Unit,
-            fechaVenc: lote.Fecha_Venc
+            costoUnit: lote.Costo_Unit || 0,
+            costoTotal: aTomar * (lote.Costo_Unit || 0),
+            fechaVenc: lote.Fecha_Venc || 'Sin fecha'
         });
         
         restante -= aTomar;
     }
     
     const costoTotal = despachos.reduce((sum, d) => sum + d.costoTotal, 0);
+    
+    console.log('✅ PEPS calculado:', despachos);
     
     return {
         error: false,
@@ -335,10 +387,38 @@ function registrarSalida() {
     });
     
     // 7. MOSTRAR resultado
-    alert(`✅ Despacho registrado\nSe utilizaron ${resultado.despachos.length} lote(s) mediante PEPS`);
-    window.location.href = 'index.html';
-    } catch(error){
-        console.error('Error al registrar la salida:', error)
-        alert('Ocurrió un error al registar la salida.\n'+error.message);
-    }
+    console.log('✅ Salida registrada exitosamente');
+    console.log('  - Lotes utilizados:', resultado.despachos.length);
+    console.log('  - Asiento contable:', numAsiento);
+    
+    //Se actualiza el dashboard 
+    mostrarDashboard();
+    verificarAlertas();
+
+    //Mostrar confirmacion al usuario 
+   let mensaje = 'Despacho registrado exitosamente\n\n';
+  mensaje += `Hospital: ${datos.hospital}\n`;
+    mensaje += `Medicamento: ${medicamento.Nombre}\n`;
+    mensaje += `Cantidad Total: ${datos.cantidad} unidades\n`;
+    mensaje += `Costo Total: $${resultado.costoTotal.toFixed(2)}\n\n`;
+    mensaje += `📦 Lotes utilizados (PEPS):\n`;
+    resultado.despachos.forEach((desp, index) => {
+        mensaje += `${index + 1}. ${desp.numLote}: ${desp.cantidad} und.\n`;
+    });
+    mensaje += `\n✅ Se generaron 2 asientos contables`;
+
+    alert(mensaje);
+     // Volver al dashboard
+    document.getElementById('contenidoDinamico').innerHTML = '';
+    
+} catch (error) {
+    console.error('❌ Error al registrar salida:', error);
+    alert('❌ Error al registrar el despacho:\n' + error.message);
+}}
+//Cancelar la salida 
+function cancelarSalida(){
+const confirmar = confirm('¿Desea cancelar el registro del despacho?');
+if (confirmar) {
+document.getElementById('contenidoDinamico').innerHTML = '';
+}
 }
