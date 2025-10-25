@@ -1,0 +1,344 @@
+// ============================================
+// MÓDULO DE SALIDAS (CON PEPS)
+// ============================================
+
+function mostrarFormularioSalida() {
+    console.log('📤 Mostrando formulario de salidas...');
+    
+    const html = `
+        <div class="formulario-salida">
+            <h2>📤 Registrar Nuevo Despacho</h2>
+            
+            <form id="formSalida" onsubmit="return false;">
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Fecha de Despacho *</label>
+                        <input type="date" id="fechaSalida" value="${new Date().toISOString().slice(0,10)}" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>N° de Despacho *</label>
+                        <input type="text" id="numDespacho" placeholder="D-00125" required>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Hospital Destino *</label>
+                    <select id="hospitalDestino" required>
+                        <option value="">-- Seleccionar --</option>
+                        <option value="Hospital Rosales">Hospital Rosales</option>
+                        <option value="Hospital Bloom">Hospital Bloom</option>
+                        <option value="Hospital San Rafael">Hospital San Rafael</option>
+                        <option value="Hospital Nacional Santa Ana">Hospital Nacional Santa Ana</option>
+                        <option value="Hospital Nacional Sonsonate">Hospital Nacional Sonsonate</option>
+                        <option value="Hospital Nacional San Miguel">Hospital Nacional San Miguel</option>
+                        <option value="Hospital de Maternidad">Hospital de Maternidad</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Medicamento *</label>
+                    <select id="medicamentoSalida" onchange="mostrarInfoSalida()" required>
+                        <option value="">-- Seleccionar --</option>
+                        ${hojas.catalogo.map(med => 
+                            `<option value="${med.Código}">${med.Código} - ${med.Nombre}</option>`
+                        ).join('')}
+                    </select>
+                </div>
+                
+                <!-- Info de disponibilidad -->
+                <div id="infoDisponibilidad" style="display:none; background:#e3f2fd; padding:15px; border-radius:8px; margin:15px 0;">
+                    <h4 style="margin-top:0;">📊 Disponibilidad</h4>
+                    <div id="detallesDisponibilidad"></div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Cantidad a Despachar *</label>
+                    <input type="number" id="cantidadSalida" min="1" placeholder="150" onchange="calcularPEPS()" required>
+                </div>
+                
+                <!-- Visualización de PEPS -->
+                <div id="visualizacionPEPS" style="display:none; background:#fff3cd; padding:20px; border-radius:8px; margin:20px 0;">
+                    <h4 style="margin-top:0;">🔄 Método PEPS - Lotes a Utilizar</h4>
+                    <p style="margin-bottom:15px;">Se despacharán automáticamente los lotes más antiguos primero:</p>
+                    <div id="lotesAPEPS"></div>
+                    <div style="margin-top:15px; padding-top:15px; border-top:2px solid #333;">
+                        <strong>Costo Total del Despacho:</strong> 
+                        <span id="costoTotalSalida" style="font-size:1.3em; color:#28a745; font-weight:bold;">$0.00</span>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Responsable del Despacho *</label>
+                    <input type="text" id="responsableSalida" placeholder="Dra. María López" required>
+                </div>
+                
+                <div style="text-align:center; margin-top:30px;">
+                    <button type="button" class="btn-secondary" onclick="cancelarSalida()">❌ Cancelar</button>
+                    <button type="button" class="btn-danger" onclick="registrarSalida()">✅ Registrar Despacho</button>
+                </div>
+                
+            </form>
+        </div>
+    `;
+    
+    document.getElementById('contenidoDinamico').innerHTML = html;
+}
+
+// ============================================
+// MOSTRAR INFO DE DISPONIBILIDAD
+// ============================================
+function mostrarInfoSalida() {
+    const codigoMed = document.getElementById('medicamentoSalida').value;
+    
+    if (!codigoMed) {
+        document.getElementById('infoDisponibilidad').style.display = 'none';
+        document.getElementById('visualizacionPEPS').style.display = 'none';
+        return;
+    }
+    
+    const medicamento = buscarMedicamento(codigoMed);
+    
+    // Calcular stock total disponible
+    const lotesDisponibles = hojas.inventario
+        .filter(lote => lote.Código_Med === codigoMed && lote.Cant_Actual > 0);
+    
+    const stockTotal = lotesDisponibles.reduce((sum, lote) => sum + (lote.Cant_Actual || 0), 0);
+    
+    let html = `
+        <p><strong>Medicamento:</strong> ${medicamento.Nombre}</p>
+        <p><strong>Stock Total Disponible:</strong> <span style="font-size:1.2em; font-weight:bold; color:${stockTotal > medicamento.Stock_Min ? 'green' : 'red'}">${stockTotal} unidades</span></p>
+        <p><strong>Stock Mínimo:</strong> ${medicamento.Stock_Min} unidades</p>
+        <p><strong>Lotes Disponibles:</strong> ${lotesDisponibles.length}</p>
+    `;
+    
+    if (stockTotal === 0) {
+        html += '<p style="color:red; font-weight:bold;">❌ Sin stock disponible - No se puede despachar</p>';
+    } else if (stockTotal < medicamento.Stock_Min) {
+        html += '<p style="color:orange; font-weight:bold;">⚠️ Stock por debajo del mínimo - Programar reabastecimiento</p>';
+    } else {
+        html += '<p style="color:green;">✅ Stock disponible para despacho</p>';
+    }
+    
+    document.getElementById('detallesDisponibilidad').innerHTML = html;
+    document.getElementById('infoDisponibilidad').style.display = 'block';
+}
+
+// ============================================
+// CALCULAR PEPS Y VISUALIZAR
+// ============================================
+function calcularPEPS() {
+    const codigoMed = document.getElementById('medicamentoSalida').value;
+    const cantidadSolicitada = parseInt(document.getElementById('cantidadSalida').value) || 0;
+    
+    if (!codigoMed || cantidadSolicitada === 0) {
+        document.getElementById('visualizacionPEPS').style.display = 'none';
+        return;
+    }
+    
+    const resultado = aplicarPEPS(codigoMed, cantidadSolicitada);
+    
+    if (resultado.error) {
+        document.getElementById('visualizacionPEPS').style.display = 'none';
+        alert('❌ ' + resultado.mensaje);
+        return;
+    }
+    
+    // Mostrar los lotes que se usarán
+    let html = '';
+    resultado.despachos.forEach((desp, index) => {
+        html += `
+            <div style="background:white; padding:12px; margin:8px 0; border-left:4px solid #28a745; border-radius:5px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <strong>Lote ${index + 1}:</strong> ${desp.numLote}<br>
+                        <span style="font-size:0.9em; color:#666;">Vence: ${desp.fechaVenc}</span>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:1.2em; font-weight:bold;">${desp.cantidad} unidades</div>
+                        <div style="color:#666;">$${desp.costoUnit.toFixed(2)} c/u = $${desp.costoTotal.toFixed(2)}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+    
+    document.getElementById('lotesAPEPS').innerHTML = html;
+    document.getElementById('costoTotalSalida').textContent = '$' + resultado.costoTotal.toFixed(2);
+    document.getElementById('visualizacionPEPS').style.display = 'block';
+}
+
+// ============================================
+// APLICAR MÉTODO PEPS
+// ============================================
+function aplicarPEPS(codigoMed, cantidadSolicitada) {
+    // 1. Filtrar lotes disponibles del medicamento
+    const lotesDisponibles = hojas.inventario
+        .filter(lote => lote.Código_Med === codigoMed && lote.Cant_Actual > 0);
+    
+    if (lotesDisponibles.length === 0) {
+        return {
+            error: true,
+            mensaje: 'No hay lotes disponibles para este medicamento'
+        };
+    }
+    
+    // 2. Ordenar por fecha de vencimiento (más antiguo primero - PEPS)
+    lotesDisponibles.sort((a, b) => {
+        const fechaA = new Date(a.Fecha_Venc.split('/').reverse().join('-'));
+        const fechaB = new Date(b.Fecha_Venc.split('/').reverse().join('-'));
+        return fechaA - fechaB;
+    });
+    
+    // 3. Verificar stock suficiente
+    const stockTotal = lotesDisponibles.reduce((sum, lote) => sum + lote.Cant_Actual, 0);
+    
+    if (stockTotal < cantidadSolicitada) {
+        return {
+            error: true,
+            mensaje: `Stock insuficiente. Disponible: ${stockTotal}, Solicitado: ${cantidadSolicitada}`
+        };
+    }
+    
+    // 4. Despachar lote por lote (PEPS)
+    let restante = cantidadSolicitada;
+    const despachos = [];
+    
+    for (let lote of lotesDisponibles) {
+        if (restante === 0) break;
+        
+        const aTomar = Math.min(restante, lote.Cant_Actual);
+        
+        despachos.push({
+            idLote: lote.ID_Lote,
+            numLote: lote.Num_Lote,
+            cantidad: aTomar,
+            costoUnit: lote.Costo_Unit,
+            costoTotal: aTomar * lote.Costo_Unit,
+            fechaVenc: lote.Fecha_Venc
+        });
+        
+        restante -= aTomar;
+    }
+    
+    const costoTotal = despachos.reduce((sum, d) => sum + d.costoTotal, 0);
+    
+    return {
+        error: false,
+        despachos: despachos,
+        costoTotal: costoTotal
+    };
+}
+
+// ============================================
+// REGISTRAR SALIDA
+// ============================================
+function registrarSalida() {
+    // Obtener datos
+    const datos = {
+        fecha: document.getElementById('fechaSalida').value,
+        numDespacho: document.getElementById('numDespacho').value.trim(),
+        hospital: document.getElementById('hospitalDestino').value,
+        codigoMed: document.getElementById('medicamentoSalida').value,
+        cantidad: parseInt(document.getElementById('cantidadSalida').value),
+        responsable: document.getElementById('responsableSalida').value.trim()
+    };
+    
+    // VALIDACIONES
+    if (!datos.numDespacho) {
+        alert('❌ El número de despacho es obligatorio');
+        return;
+    }
+    
+    if (!datos.hospital) {
+        alert('❌ Debe seleccionar un hospital destino');
+        return;
+    }
+    
+    if (!datos.codigoMed) {
+        alert('❌ Debe seleccionar un medicamento');
+        return;
+    }
+    
+    if (datos.cantidad <= 0) {
+        alert('❌ La cantidad debe ser mayor a 0');
+        return;
+    }
+    
+    if (!datos.responsable) {
+        alert('❌ Debe indicar el responsable del despacho');
+        return;
+    }
+    
+    console.log('📤 Registrando salida...', datos);
+    
+    try {
+        // Aplicar PEPS
+        const resultado = aplicarPEPS(datos.codigoMed, datos.cantidad);
+        
+        if (resultado.error) {
+            alert('❌ ' + resultado.mensaje);
+            return;
+        }
+        
+        const medicamento = buscarMedicamento(datos.codigoMed);
+        
+        // Actualizar cantidades en Inventario_Lotes
+        resultado.despachos.forEach(desp => {
+            const lote = hojas.inventario.find(l => l.ID_Lote === desp.idLote);
+            lote.Cant_Actual -= desp.cantidad;
+            
+            // Si se agotó, cambiar estado
+            if (lote.Cant_Actual === 0) {
+                lote.Estado = '❌ Agotado';
+            }
+        });
+        
+        // Registrar cada despacho en Libro_Salidas
+        resultado.despachos.forEach(desp => {
+            hojas.salidas.push({
+                Fecha: formatearFecha(new Date(datos.fecha)),
+                Num_Despacho: datos.numDespacho,
+                Hospital_Destino: datos.hospital,
+                Código_Med: datos.codigoMed,
+                Nombre_Med: medicamento.Nombre,
+                Num_Lote: desp.numLote,
+                Cantidad: desp.cantidad,
+                Costo_Unit: desp.costoUnit,
+                Total: desp.costoTotal,
+                Responsable: datos.responsable
+            });
+        });
+        
+        // Generar asientos contables
+        const numAsiento = obtenerUltimoAsiento() + 1;
+        const descripcion = `Despacho ${datos.hospital} - ${datos.numDespacho}`;
+        
+        hojas.diario.push({
+            Fecha: formatearFecha(new Date(datos.fecha)),
+            Num_Asiento: numAsiento,
+            Descripción: descripcion, 
+            Cuenta: 'Costo de medicamentos despachados', 
+            Debe: resultado.costoTotal,
+            Haber: 0
+        }) ;
+        
+        //Asiento 2  Haber - Inventario 
+         hojas.diario.push({
+        Fecha: datos.fecha,
+        Num_Asiento: numAsiento,
+        Descripción: descripcion,
+        Cuenta: 'Inventario de Medicamentos',
+        Debe: 0,
+        Haber: resultado.costoTotal
+    });
+    
+    // 7. MOSTRAR resultado
+    alert(`✅ Despacho registrado\nSe utilizaron ${resultado.despachos.length} lote(s) mediante PEPS`);
+    window.location.href = 'index.html';
+    } catch(error){
+        console.error('Error al registrar la salida:', error)
+        alert('Ocurrió un error al registar la salida.\n'+error.message);
+    }
+}
