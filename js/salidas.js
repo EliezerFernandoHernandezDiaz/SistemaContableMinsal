@@ -1,4 +1,21 @@
 // ============================================
+// FUNCIÓN AUXILIAR: FORMATEAR FECHA + HORA
+// ============================================
+function formatearFechaHora(fecha) {
+    const f = fecha instanceof Date ? fecha : new Date(fecha);
+    
+    const dia = String(f.getDate()).padStart(2, '0');
+    const mes = String(f.getMonth() + 1).padStart(2, '0');
+    const anio = f.getFullYear();
+    
+    const horas = String(f.getHours()).padStart(2, '0');
+    const minutos = String(f.getMinutes()).padStart(2, '0');
+    const segundos = String(f.getSeconds()).padStart(2, '0');
+    
+    return `${dia}/${mes}/${anio} ${horas}:${minutos}:${segundos}`;
+}
+
+// ============================================
 // MÓDULO DE SALIDAS (CON PEPS)
 // ============================================
 
@@ -286,20 +303,14 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
 // ============================================
 // REGISTRAR SALIDA
 // ============================================
+// ============================================
+// REGISTRAR SALIDA (VERSIÓN CORREGIDA)
+// ============================================
 function registrarSalida() {
-
-//Validar si hay stock suficiente antes de registrar 
-    const totalShock= hojas.inventario
-    .filter(l => l.Código_Med === datos.codigoMed)
-    .reduce((sum, l) => sum + (l.Cant_Actual || 0), 0);
-
-    if (totalStock < datos.cantidad) {
-    alert(`❌ No hay suficiente stock disponible. Disponible: ${totalStock}`);
-    return;
-    }
-    // Obtener datos
+    
+    // 1. PRIMERO: Obtener datos del formulario
     const datos = {
-        fecha: document.getElementById('fechaSalida').value,
+        fecha: new Date(),
         numDespacho: document.getElementById('numDespacho').value.trim(),
         hospital: document.getElementById('hospitalDestino').value,
         codigoMed: document.getElementById('medicamentoSalida').value,
@@ -307,7 +318,7 @@ function registrarSalida() {
         responsable: document.getElementById('responsableSalida').value.trim()
     };
     
-    // VALIDACIONES
+    // 2. VALIDACIONES BÁSICAS
     if (!datos.numDespacho) {
         alert('❌ El número de despacho es obligatorio');
         return;
@@ -323,7 +334,7 @@ function registrarSalida() {
         return;
     }
     
-    if (datos.cantidad <= 0) {
+    if (isNaN(datos.cantidad) || datos.cantidad <= 0) {
         alert('❌ La cantidad debe ser mayor a 0');
         return;
     }
@@ -333,10 +344,20 @@ function registrarSalida() {
         return;
     }
     
+    // 3. AHORA SÍ: Validar si hay stock suficiente
+    const totalStock = hojas.inventario
+        .filter(l => l.Código_Med === datos.codigoMed)
+        .reduce((sum, l) => sum + (l.Cant_Actual || 0), 0);
+
+    if (totalStock < datos.cantidad) {
+        alert(`❌ No hay suficiente stock disponible.\nDisponible: ${totalStock} unidades\nSolicitado: ${datos.cantidad} unidades`);
+        return;
+    }
+    
     console.log('📤 Registrando salida...', datos);
     
     try {
-        // Aplicar PEPS
+        // 4. Aplicar PEPS
         const resultado = aplicarPEPS(datos.codigoMed, datos.cantidad);
         
         if (resultado.error) {
@@ -346,21 +367,23 @@ function registrarSalida() {
         
         const medicamento = buscarMedicamento(datos.codigoMed);
         
-        // Actualizar cantidades en Inventario_Lotes
+        // 5. Actualizar cantidades en Inventario_Lotes
         resultado.despachos.forEach(desp => {
             const lote = hojas.inventario.find(l => l.ID_Lote === desp.idLote);
-            lote.Cant_Actual -= desp.cantidad;
-            
-            // Si se agotó, cambiar estado
-            if (lote.Cant_Actual === 0) {
-                lote.Estado = '❌ Agotado';
+            if (lote) {
+                lote.Cant_Actual -= desp.cantidad;
+                
+                // Si se agotó, cambiar estado
+                if (lote.Cant_Actual === 0) {
+                    lote.Estado = 'Agotado';
+                }
             }
         });
         
-        // Registrar cada despacho en Libro_Salidas
+        // 6. Registrar cada despacho en Libro_Salidas
         resultado.despachos.forEach(desp => {
             hojas.salidas.push({
-                Fecha: formatearFecha(new Date(datos.fecha)),
+                Fecha: formatearFechaHora(datos.fecha),
                 Num_Despacho: datos.numDespacho,
                 Hospital_Destino: datos.hospital,
                 Código_Med: datos.codigoMed,
@@ -373,61 +396,77 @@ function registrarSalida() {
             });
         });
         
-        // Generar asientos contables
+        // 7. Generar asientos contables
         const numAsiento = obtenerUltimoAsiento() + 1;
         const descripcion = `Despacho ${datos.hospital} - ${datos.numDespacho}`;
         
+        // Asiento 1: Debe - Costo de medicamentos despachados
         hojas.diario.push({
-            Fecha: formatearFecha(new Date(datos.fecha)),
+            Fecha: formatearFechaHora(datos.fecha),
             Num_Asiento: numAsiento,
             Descripción: descripcion, 
             Cuenta: 'Costo de medicamentos despachados', 
             Debe: resultado.costoTotal,
             Haber: 0
-        }) ;
+        });
         
-        //Asiento 2  Haber - Inventario 
-         hojas.diario.push({
-        Fecha: formatearFecha(new Date (datos.fecha)),
-        Num_Asiento: numAsiento,
-        Descripción: descripcion,
-        Cuenta: 'Inventario de Medicamentos',
-        Debe: 0,
-        Haber: resultado.costoTotal
-    });
-    
-    // 7. MOSTRAR resultado
-    console.log('✅ Salida registrada exitosamente');
-    console.log('  - Lotes utilizados:', resultado.despachos.length);
-    console.log('  - Asiento contable:', numAsiento);
-    
-    //Se actualiza el dashboard. recalcula el estado de los lotes y el stock global 
-    recalcAll();
-    actualizarLibroMayor(); 
-    guardarExcel(); //se guarda el excel 
-    mostrarDashboard();
-    verificarAlertas();
+        // Asiento 2: Haber - Inventario 
+        hojas.diario.push({
+            Fecha: formatearFechaHora(datos.fecha),
+            Num_Asiento: numAsiento,
+            Descripción: descripcion,
+            Cuenta: 'Inventario de Medicamentos',
+            Debe: 0,
+            Haber: resultado.costoTotal
+        });
+        
+        // 8. MOSTRAR resultado
+        console.log('✅ Salida registrada exitosamente');
+        console.log('  - Lotes utilizados:', resultado.despachos.length);
+        console.log('  - Costo total: $' + resultado.costoTotal.toFixed(2));
+        console.log('  - Asiento contable:', numAsiento);
+        
+        // 9. Actualizar dashboard y verificar alertas
+        if (typeof recalcAll === 'function') recalcAll();
+        if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
+        if (typeof guardarExcel === 'function') guardarExcel();
+        
+        mostrarDashboard();
+        verificarAlertas();
 
-    //Mostrar confirmacion al usuario 
-   let mensaje = 'Despacho registrado exitosamente\n\n';
-  mensaje += `Hospital: ${datos.hospital}\n`;
-    mensaje += `Medicamento: ${medicamento.Nombre}\n`;
-    mensaje += `Cantidad Total: ${datos.cantidad} unidades\n`;
-    mensaje += `Costo Total: $${resultado.costoTotal.toFixed(2)}\n\n`;
-    mensaje += `📦 Lotes utilizados (PEPS):\n`;
-    resultado.despachos.forEach((desp, index) => {
-        mensaje += `${index + 1}. ${desp.numLote}: ${desp.cantidad} und.\n`;
-    });
-    mensaje += `\n✅ Se generaron 2 asientos contables`;
+        // 10. Mostrar confirmación al usuario 
+        let mensaje = '✅ Despacho registrado exitosamente\n\n';
+        mensaje += `🏥 Hospital: ${datos.hospital}\n`;
+        mensaje += `💊 Medicamento: ${medicamento.Nombre}\n`;
+        mensaje += `📦 Cantidad Total: ${datos.cantidad} unidades\n`;
+        mensaje += `💰 Costo Total: $${resultado.costoTotal.toFixed(2)}\n\n`;
+        mensaje += `📋 Lotes utilizados (PEPS):\n`;
+        resultado.despachos.forEach((desp, index) => {
+            mensaje += `  ${index + 1}. Lote ${desp.numLote}: ${desp.cantidad} und. × $${desp.costoUnit.toFixed(2)} = $${desp.costoTotal.toFixed(2)}\n`;
+        });
+        mensaje += `\n📊 Se generaron 2 asientos contables (#${numAsiento})`;
 
-    alert(mensaje);
-     // Volver al dashboard
-    document.getElementById('contenidoDinamico').innerHTML = '';
-    
-} catch (error) {
-    console.error('❌ Error al registrar salida:', error);
-    alert('❌ Error al registrar el despacho:\n' + error.message);
-}}
+        alert(mensaje);
+        
+        // 11. Volver al dashboard
+        document.getElementById('contenidoDinamico').innerHTML = '';
+        
+    } catch (error) {
+        console.error('❌ Error al registrar salida:', error);
+        alert('❌ Error al registrar el despacho:\n' + error.message);
+    }
+}
+
+// ============================================
+// CANCELAR LA SALIDA
+// ============================================
+function cancelarSalida() {
+    const confirmar = confirm('¿Desea cancelar el registro del despacho?');
+    if (confirmar) {
+        document.getElementById('contenidoDinamico').innerHTML = '';
+        mostrarDashboard();
+    }
+}
 //Cancelar la salida 
 function cancelarSalida(){
 const confirmar = confirm('¿Desea cancelar el registro del despacho?');
