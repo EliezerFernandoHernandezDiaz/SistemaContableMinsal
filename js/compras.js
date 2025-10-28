@@ -325,6 +325,7 @@ function registrarCompra() {
               `Cantidad: ${datos.cantidad} unidades\n` +
               `Total: $${total.toFixed(2)}\n\n` +
               `Se generaron 3 asientos contables en el Libro Diario.`);
+              
         
         // Volver al dashboard
         document.getElementById('contenidoDinamico').innerHTML = '';

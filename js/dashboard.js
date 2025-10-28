@@ -575,3 +575,22 @@ function exportarMayorExcel() {
     XLSX.writeFile(wb, "Libro_Mayor_Actualizado.xlsx");
     alert('✅ Libro Mayor exportado correctamente.');
 }
+if (typeof formatearFecha === 'undefined') {
+    function formatearFecha(valor) {
+        if (!valor || valor === "null" || valor === "") return "—";
+        const texto = String(valor).trim();
+
+        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(texto)) return texto;
+
+        if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+            const [y, m, d] = texto.split("-");
+            return `${d}/${m}/${y}`;
+        }
+
+        if (!isNaN(texto)) {
+            return procesarFecha(Number(texto));
+        }
+
+        return texto;
+    }
+}
