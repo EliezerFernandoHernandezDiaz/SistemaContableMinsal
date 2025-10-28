@@ -287,6 +287,16 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
 // REGISTRAR SALIDA
 // ============================================
 function registrarSalida() {
+
+//Validar si hay stock suficiente antes de registrar 
+    const totalShock= hojas.inventario
+    .filter(l => l.Código_Med === datos.codigoMed)
+    .reduce((sum, l) => sum + (l.Cant_Actual || 0), 0);
+
+    if (totalStock < datos.cantidad) {
+    alert(`❌ No hay suficiente stock disponible. Disponible: ${totalStock}`);
+    return;
+    }
     // Obtener datos
     const datos = {
         fecha: document.getElementById('fechaSalida').value,
@@ -378,7 +388,7 @@ function registrarSalida() {
         
         //Asiento 2  Haber - Inventario 
          hojas.diario.push({
-        Fecha: datos.fecha,
+        Fecha: formatearFecha(new Date (datos.fecha)),
         Num_Asiento: numAsiento,
         Descripción: descripcion,
         Cuenta: 'Inventario de Medicamentos',
@@ -391,7 +401,10 @@ function registrarSalida() {
     console.log('  - Lotes utilizados:', resultado.despachos.length);
     console.log('  - Asiento contable:', numAsiento);
     
-    //Se actualiza el dashboard 
+    //Se actualiza el dashboard. recalcula el estado de los lotes y el stock global 
+    recalcAll();
+    actualizarLibroMayor(); 
+    guardarExcel(); //se guarda el excel 
     mostrarDashboard();
     verificarAlertas();
 

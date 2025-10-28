@@ -310,9 +310,13 @@ function registrarCompra() {
         console.log('  - Lote creado:', nuevoLote.ID_Lote);
         console.log('  - Asiento contable:', numAsiento);
         
-        // Actualizar dashboard
+        // Actualizar dashboard, recalcular y guardar excel 
+        recalcAll()
+        actualizarLibroMayor();
         mostrarDashboard();
         verificarAlertas();
+        guardarExcel();
+        
         
         // Mostrar confirmación
         alert(`✅ Compra registrada exitosamente\n\n` +

@@ -148,6 +148,11 @@ function cargarArchivo() {
     };
     
     reader.readAsArrayBuffer(file);
+    //arego la funcion de recalcAll
+    recalcAll();
+
+    //Y también la del dashboard para mostrar los resultados 
+  mostrarDashboard();   
 }
 
 // ============================================
@@ -226,4 +231,8 @@ function guardarExcel() {
         console.error('❌ Error al guardar:', error);
         alert('❌ Error al guardar el archivo:\n' + error.message);
     }
+
+    //Se llama a la función del motor contable 
+    recalcAll();//recalcula todo antes de guardar 
+    mostrarDashboard(); //muestra el dashboard actualizado
 }

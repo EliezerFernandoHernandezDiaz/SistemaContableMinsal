@@ -243,6 +243,28 @@ table tr:hover {
     background: #f8f9fa;
 }
 
+.tabla-mayor{
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    background: #fff;
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.tabla-mayor th {
+    background-color: #3f51b5;
+    color: white;
+    padding: 10px;
+    text-align: left;
+}
+
+.tabla-mayor td {
+    padding: 10px;
+    border-bottom: 1px solid #ddd;
+}
+
 /* Formularios */
 .form-group {
     margin-bottom: 20px;
