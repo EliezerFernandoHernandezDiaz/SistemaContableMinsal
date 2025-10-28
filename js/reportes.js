@@ -135,9 +135,9 @@ function reporteMedicamentosCriticos() {
             <tr style="${item.alertaBajoStock ? 'background:#ffe6e6;' : ''}">
                 <td>${item.codigo}</td>
                 <td><strong>${item.nombre}</strong></td>
-                <td>${item.stock.toLocaleString()}</td>
-                <td>${item.stockMin.toLocaleString()}</td>
-                <td>$${item.valorTotal.toFixed(2)}</td>
+               <td>${formatearNumero(item.stock)}</td>
+                <td>${formatearNumero(item.stockMin)}</td>
+                 <td>${formatearDinero(item.valorTotal)}</td>
                 <td>${estado}</td>
             </tr>
         `;
@@ -148,7 +148,7 @@ function reporteMedicamentosCriticos() {
                 <tfoot>
                     <tr style="background:#f0f0f0; font-weight:bold;">
                         <td colspan="4">TOTAL CLASE A</td>
-                        <td>$${valorTotalA.toFixed(2)}</td>
+                           <td>${formatearDinero(valorTotalA)}</td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -220,7 +220,7 @@ function reporteProximosVencer() {
                     <h3>🔴 URGENTE</h3>
                     <p style="font-size:2em; font-weight:bold; margin:10px 0;">${urgente.length}</p>
                     <p>≤ 30 días</p>
-                    <p>Valor: $${valorUrgente.toFixed(2)}</p>
+                  <p>Valor: ${formatearDinero(valorUrgente)}</p>
                 </div>
                 <div style="background:#fff3cd; padding:20px; border-radius:8px; text-align:center;">
                     <h3>🟡 ATENCIÓN</h3>
@@ -253,10 +253,10 @@ function reporteProximosVencer() {
                         <tr style="background:#ffebee;">
                             <td><strong>${lote.Nombre_Med}</strong></td>
                             <td>${lote.Num_Lote}</td>
-                            <td>${lote.Cant_Actual}</td>
+                             <td>${formatearNumero(lote.Cant_Actual)}</td>
                             <td>${lote.Fecha_Venc}</td>
                             <td><strong style="color:red;">${lote.diasRestantes} días</strong></td>
-                            <td>$${lote.valorRiesgo.toFixed(2)}</td>
+                              <td>${formatearDinero(lote.valorRiesgo)}</td>
                             <td>${lote.diasRestantes <= 10 ? 'DESPACHAR YA' : 'Usar prioritariamente'}</td>
                         </tr>
                     `).join('')}
@@ -325,21 +325,21 @@ function reporteValoracionABC() {
                         <td><span class="badge badge-a">A</span> Alto Valor</td>
                         <td>${cantA}</td>
                         <td>${((cantA/hojas.catalogo.length)*100).toFixed(1)}%</td>
-                        <td><strong>$${valorA.toFixed(2)}</strong></td>
+                        <td>${formatearDinero(valorA)}</td>
                         <td><strong>${porcA}%</strong></td>
                     </tr>
                     <tr style="background:#fff3cd;">
                         <td><span class="badge badge-b">B</span> Valor Medio</td>
                         <td>${cantB}</td>
                         <td>${((cantB/hojas.catalogo.length)*100).toFixed(1)}%</td>
-                        <td><strong>$${valorB.toFixed(2)}</strong></td>
+                        <td>${formatearDinero(valorB)}</td>
                         <td><strong>${porcB}%</strong></td>
                     </tr>
                     <tr style="background:#d4edda;">
                         <td><span class="badge badge-c">C</span> Valor Bajo</td>
                         <td>${cantC}</td>
                         <td>${((cantC/hojas.catalogo.length)*100).toFixed(1)}%</td>
-                        <td><strong>$${valorC.toFixed(2)}</strong></td>
+                        <td>${formatearDinero(valorC)}</td>
                         <td><strong>${porcC}%</strong></td>
                     </tr>
                 </tbody>
@@ -348,7 +348,7 @@ function reporteValoracionABC() {
                         <td>TOTAL</td>
                         <td>${hojas.catalogo.length}</td>
                         <td>100%</td>
-                        <td>$${valorTotal.toFixed(2)}</td>
+                        <td>${formatearDinero(valorTotal)}</td>
                         <td>100%</td>
                     </tr>
                 </tfoot>
@@ -357,9 +357,10 @@ function reporteValoracionABC() {
             <div style="background:#e3f2fd; padding:20px; border-radius:8px; margin-top:20px;">
                 <h4>📊 Interpretación del Análisis ABC:</h4>
                 <ul>
-                    <li><strong>Clase A:</strong> ${cantA} medicamentos (${((cantA/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcA}% del valor total</li>
-                    <li><strong>Clase B:</strong> ${cantB} medicamentos (${((cantB/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcB}% del valor total</li>
-                    <li><strong>Clase C:</strong> ${cantC} medicamentos (${((cantC/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcC}% del valor total</li>
+                     <li><strong>Clase A:</strong> ${formatearNumero(cantA)} medicamentos (${((cantA/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcA}% del valor total</li>
+                    <li><strong>Clase B:</strong> ${formatearNumero(cantB)} medicamentos (${((cantB/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcB}% del valor total</li>
+                    <li><strong>Clase C:</strong> ${formatearNumero(cantC)} medicamentos (${((cantC/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcC}% del valor total</li>
+                </ul>
                 </ul>
                 <p style="margin-top:15px;"><strong>💡 Recomendación:</strong> Enfocar el 80% de los esfuerzos de control en los medicamentos Clase A.</p>
             </div>
@@ -382,7 +383,7 @@ function reporteMovimientos() {
         <div class="reporte-detalle">
             <h2>📋 Reporte: Movimientos del Mes</h2>
             
-            <h3>📥 Compras Registradas (${hojas.compras.length})</h3>
+            <h3>📥 Compras Registradas (${formatearNumero(hojas.compras.length)})</h3>
             ${hojas.compras.length === 0 ? '<p>No hay compras registradas</p>' : `
             <table>
                 <thead>
@@ -402,42 +403,43 @@ function reporteMovimientos() {
                             <td>${c.Num_Factura}</td>
                             <td>${c.Proveedor}</td>
                             <td>${c.Nombre_Med}</td>
-                            <td>${c.Cantidad}</td>
-                            <td>$${(c.Total || 0).toFixed(2)}</td>
+                           <td>${formatearNumero(c.Cantidad)}</td>
+                            <td>${formatearDinero(c.Total)}</td>
                         </tr>
                     `).join('')}
                 </tbody>
             </table>
             `}
             
-            <h3 style="margin-top:30px;">📤 Salidas Registradas (${hojas.salidas.length})</h3>
-            ${hojas.salidas.length === 0 ? '<p>No hay salidas registradas</p>' : `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Fecha</th>
-                        <th>N° Despacho</th>
-                        <th>Hospital</th>
-                        <th>Medicamento</th>
-                        <th>Cantidad</th>
-                        <th>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${hojas.salidas.map(s => `
-                        <tr>
-                            <td>${s.Fecha}</td>
-                            <td>${s.Num_Despacho}</td>
-                            <td>${s.Hospital_Destino}</td>
-                            <td>${s.Nombre_Med}</td>
-                            <td>${s.Cantidad}</td>
-                            <td>$${(s.Total || 0).toFixed(2)}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-            `}
-            
+        <h3 style="margin-top:30px;">📤 Salidas Registradas (${hojas.salidas.length})</h3>
+${hojas.salidas.length === 0 ? '<p>No hay salidas registradas</p>' : `
+<table>
+    <thead>
+        <tr>
+            <th>Fecha</th>
+            <th>N° Despacho</th>
+            <th>Hospital</th>
+            <th>Medicamento</th>
+            <th>Cantidad</th>
+            <th>Costo Unit.</th>
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        ${hojas.salidas.map(s => `
+            <tr>
+                <td>${s.Fecha}</td>
+                <td>${s.Num_Despacho}</td>
+                <td>${s.Hospital_Destino}</td>
+                <td>${s.Nombre_Med}</td>
+                 <td>${formatearNumero(s.Cantidad_Despachada)}</td>
+                <td>${formatearDinero(s.Costo_Unit || s.Costo_Unit_1 || 0)}</td>
+                <td>${formatearDinero(s.Total || s.Total_1 || 0)}</td>
+            </tr>
+        `).join('')}
+    </tbody>
+</table>
+`}
             <div style="text-align:center; margin-top:30px;">
                 <button onclick="verReportes()">← Volver a Reportes</button>
             </div>

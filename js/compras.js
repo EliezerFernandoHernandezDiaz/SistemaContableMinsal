@@ -315,7 +315,6 @@ function registrarCompra() {
         actualizarLibroMayor();
         mostrarDashboard();
         verificarAlertas();
-        guardarExcel();
         
         
         // Mostrar confirmación

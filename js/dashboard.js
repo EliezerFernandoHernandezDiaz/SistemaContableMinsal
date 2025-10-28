@@ -1,3 +1,25 @@
+///Función auxiliar para manejar los valores con separación de miles y decimales
+function formatearNumero(numero) {
+    if (numero === null || numero === undefined || numero === '' || isNaN(numero)) {
+        return '0';
+    }
+    return Number(numero).toLocaleString('en-US'); // Usa comas para miles
+}
+
+
+// ============================================
+// FUNCIÓN AUXILIAR: FORMATEAR DINERO
+// ============================================
+function formatearDinero(monto) {
+    if (monto === null || monto === undefined || monto === '' || isNaN(monto)) {
+        return '$0.00';
+    }
+    return '$' + Number(monto).toLocaleString('en-US', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+}
+
 // ============================================
 // MOSTRAR DASHBOARD
 // ============================================
@@ -15,19 +37,19 @@ function mostrarDashboard() {
     const html = `
         <div class="metrica">
             <h4>Valor Total Inventario</h4>
-            <p class="valor">$${valorTotal.toLocaleString('es-SV', {minimumFractionDigits: 2})}</p>
+            <p class="valor">${formatearDinero(valorTotal)}</p>
         </div>
         <div class="metrica">
             <h4>Total Medicamentos</h4>
-            <p class="valor">${totalMedicamentos}</p>
+            <p class="valor">${formatearNumero(totalMedicamentos)}</p>
         </div>
         <div class="metrica">
             <h4>Total Lotes Activos</h4>
-            <p class="valor">${totalLotes}</p>
+           <p class="valor">${formatearNumero(totalLotes)}</p>
         </div>
         <div class="metrica">
             <h4>Compras Registradas</h4>
-            <p class="valor">${totalCompras}</p>
+           <p class="valor">${formatearNumero(totalCompras)}</p>
         </div>
     `;
     
@@ -192,9 +214,9 @@ function verCatalogo() {
         <td>${concentracion}</td>
         <td>$${(med.Precio_Unit || 0).toFixed(2)}</td>
         <td>${badgeClase}</td>
-        <td>${med.Stock_Min || 0}</td>
-        <td>${med.Stock_Max || 0}</td>
-        <td ${colorStock}>${stockActual}</td>
+        <td>${formatearNumero(med.Stock_Min || 0)}</td>
+        <td>${formatearNumero(med.Stock_Max || 0)}</td>
+      <td ${colorStock}>${formatearNumero(stockActual)}</td>
       </tr>
     `;
   });
@@ -270,8 +292,8 @@ function verInventario() {
                 <td>${lote.Código_Med || "—"}</td>
                 <td><strong>${lote.Nombre_Med || "—"}</strong></td>
                 <td>${lote.Num_Lote || "—"}</td>
-                <td>${lote.Cant_Inicial || 0}</td>
-                <td><strong>${lote.Cant_Actual || 0}</strong></td>
+                <td>${formatearNumero(lote.Cant_Inicial || 0)}</td>
+                <td><strong>${formatearNumero(lote.Cant_Actual || 0)}</strong></td>
                 <td>${fechaFabDisplay}</td>
                 <td>${fechaVencDisplay}</td>
                 <td>$${(lote.Costo_Unit || 0).toFixed(2)}</td>
@@ -379,8 +401,8 @@ function verLibroDiario() {
             html += `<td>${asiento.Num_Asiento || ''}</td>`;
             html += `<td>${asiento.Descripción || ''}</td>`;
             html += `<td>${asiento.Cuenta || ''}</td>`;
-            html += `<td>${asiento.Debe > 0 ? '$' + asiento.Debe.toFixed(2) : ''}</td>`;
-            html += `<td>${asiento.Haber > 0 ? '$' + asiento.Haber.toFixed(2) : ''}</td>`;
+            html += `<td>${asiento.Debe > 0 ? formatearDinero(asiento.Debe) : ''}</td>`;
+            html += `<td>${asiento.Haber > 0 ? formatearDinero(asiento.Haber) : ''}</td>`;
             html += '</tr>';
         });
         
@@ -390,14 +412,6 @@ function verLibroDiario() {
     document.getElementById('contenidoDinamico').innerHTML = html;
 }
 
-// Funciones placeholder (se programarán después)
-function mostrarFormularioCompra() {
-    alert('⚠️ Módulo de compras en desarrollo...\nPróximamente podrás registrar compras desde aquí.');
-}
-
-function mostrarFormularioSalida() {
-    alert('⚠️ Módulo de salidas en desarrollo...\nPróximamente podrás registrar salidas con PEPS automático.');
-}
 /// ============================================
 // MÓDULO: LIBRO MAYOR (INTERACTIVO + CONTABLE)
 // ============================================
@@ -470,8 +484,8 @@ function verLibroMayor() {
             text-align:center;
             font-size:1.1em;
             font-weight:bold;">
-            <div>💰 Total Debe:<br><span style='color:#28a745;'>$${totalDebe.toFixed(2)}</span></div>
-            <div>💵 Total Haber:<br><span style='color:#dc3545;'>$${totalHaber.toFixed(2)}</span></div>
+            <div>💰 Total Debe:<br><span style='color:#28a745;'>${formatearDinero(totalDebe)}</span></div>
+            <div>💵 Total Haber:<br><span style='color:#dc3545;'>${formatearDinero(totalHaber)}</span></div>
             <div>${balanceado ? 
                 "<span style='color:green;'>✅ Balanceado</span>" : 
                 "<span style='color:red;'>⚠️ Desbalanceado</span>"}
@@ -519,9 +533,9 @@ function verLibroMayor() {
                     <td>${mov.Fecha}</td>
                     <td>${mov.Num_Asiento}</td>
                     <td>${mov.Descripción}</td>
-                    <td style="text-align:right;">${mov.Debe > 0 ? '$' + mov.Debe.toFixed(2) : ''}</td>
-                    <td style="text-align:right;">${mov.Haber > 0 ? '$' + mov.Haber.toFixed(2) : ''}</td>
-                    <td style="text-align:right; font-weight:bold;">$${saldoAcumulado.toFixed(2)}</td>
+                    <td style="text-align:right;">${mov.Debe > 0 ? formatearDinero(mov.Debe) : ''}</td>
+                    <td style="text-align:right;">${mov.Haber > 0 ? formatearDinero(mov.Haber) : ''}</td>
+                    <td style="text-align:right; font-weight:bold;">${formatearDinero(saldoAcumulado)}</td>
                 </tr>
             `;
         });
@@ -531,9 +545,9 @@ function verLibroMayor() {
                     <tfoot>
                         <tr style="background:#667eea; color:white; font-weight:bold;">
                             <td colspan="3">TOTALES</td>
-                            <td style="text-align:right;">$${cuenta.totalDebe.toFixed(2)}</td>
-                            <td style="text-align:right;">$${cuenta.totalHaber.toFixed(2)}</td>
-                            <td style="text-align:right;">$${saldoFinal.toFixed(2)}</td>
+                            <td style="text-align:right;">${formatearDinero(cuenta.totalDebe)}</td>
+                            <td style="text-align:right;">${formatearDinero(cuenta.totalHaber)}</td>
+                            <td style="text-align:right;">${formatearDinero(saldoFinal)}</td>
                         </tr>
                     </tfoot>
                 </table>

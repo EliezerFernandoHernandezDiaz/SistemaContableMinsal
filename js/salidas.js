@@ -379,23 +379,21 @@ function registrarSalida() {
                 }
             }
         });
-        
-        // 6. Registrar cada despacho en Libro_Salidas
-        resultado.despachos.forEach(desp => {
+           resultado.despachos.forEach(desp => {
             hojas.salidas.push({
-                Fecha: formatearFechaHora(datos.fecha),
-                Num_Despacho: datos.numDespacho,
-                Hospital_Destino: datos.hospital,
-                Código_Med: datos.codigoMed,
-                Nombre_Med: medicamento.Nombre,
-                Num_Lote: desp.numLote,
-                Cantidad: desp.cantidad,
-                Costo_Unit: desp.costoUnit,
-                Total: desp.costoTotal,
-                Responsable: datos.responsable
-            });
-        });
-        
+                
+            Fecha: formatearFechaHora(datos.fecha),
+            Num_Despacho: datos.numDespacho,
+            Hospital_Destino: datos.hospital,
+            Código_Med: datos.codigoMed,
+            Nombre_Med: medicamento.Nombre,
+            Num_Lote: desp.numLote,
+            Cantidad_Despachada: desp.cantidad,              // ⬅️ SIN formatear (número puro)
+            Costo_Unit: desp.costoUnit || 0,                 // ⬅️ SIN formatear
+            Total: desp.costoTotal || 0,                     // ⬅️ SIN formatear
+            Responsable: datos.responsable
+    });
+});
         // 7. Generar asientos contables
         const numAsiento = obtenerUltimoAsiento() + 1;
         const descripcion = `Despacho ${datos.hospital} - ${datos.numDespacho}`;
@@ -429,7 +427,7 @@ function registrarSalida() {
         // 9. Actualizar dashboard y verificar alertas
         if (typeof recalcAll === 'function') recalcAll();
         if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
-        if (typeof guardarExcel === 'function') guardarExcel();
+
         
         mostrarDashboard();
         verificarAlertas();
