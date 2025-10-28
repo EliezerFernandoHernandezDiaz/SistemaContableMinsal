@@ -207,138 +207,150 @@ function verCatalogo() {
   document.getElementById("contenidoDinamico").innerHTML = html;
 }
 
-
-// ============================================
-// VER INVENTARIO POR LOTES (versión mejorada)
-// ============================================
 function verInventario() {
-  console.log("📦 Mostrando inventario por lotes...");
+    console.log("📦 Mostrando inventario por lotes...");
 
-  let html = `
-    <h2>📦 Inventario por Lotes</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>ID Lote</th>
-          <th>Código</th>
-          <th>Medicamento</th>
-          <th>N° Lote</th>
-          <th>Cant. Inicial</th>
-          <th>Cant. Actual</th>
-          <th>Fecha Fab.</th>
-          <th>Fecha Venc.</th>
-          <th>Costo Unit.</th>
-          <th>Estado</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
-
-  hojas.inventario.forEach((lote) => {
-    // --- Determinar estado del lote ---
-    let estado = "";
-    let badgeClass = "";
-
-    const hoy = new Date();
-
-    // Normalizar las fechas antes de usarlas
-    const fechaFab = normalizarFecha(lote.Fecha_Fab);
-    const fechaVenc = normalizarFecha(lote.Fecha_Venc);
-
-    // Convertir para cálculos
-    let fechaVencimientoReal;
-    try {
-      if (typeof lote.Fecha_Venc === "number") {
-        // Fecha en formato Excel
-        const excelBase = new Date(1899, 11, 30);
-        fechaVencimientoReal = new Date(
-          excelBase.getTime() + lote.Fecha_Venc * 86400000
-        );
-      } else {
-        fechaVencimientoReal = new Date(lote.Fecha_Venc);
-      }
-    } catch {
-      fechaVencimientoReal = hoy;
-    }
-
-    if (lote.Cant_Actual === 0) {
-      estado = "Agotado";
-      badgeClass = "badge-agotado";
-    } else if (fechaVencimientoReal < hoy) {
-      estado = "Vencido";
-      badgeClass = "badge-vencido";
-    } else {
-      const dias = Math.floor(
-        (fechaVencimientoReal - hoy) / (1000 * 60 * 60 * 24)
-      );
-      if (dias <= 30) {
-        estado = "Por Vencer";
-        badgeClass = "badge-vencer";
-      } else {
-        estado = "Activo";
-        badgeClass = "badge-activo";
-      }
-    }
-
-    // --- Renderizar la fila ---
-    html += `
-      <tr>
-        <td>${lote.ID_Lote || "—"}</td>
-        <td>${lote.Código_Med || "—"}</td>
-        <td><strong>${lote.Nombre_Med || "—"}</strong></td>
-        <td>${lote.Num_Lote || "—"}</td>
-        <td>${lote.Cant_Inicial || 0}</td>
-        <td><strong>${lote.Cant_Actual || 0}</strong></td>
-        <td>${fechaFab}</td>
-        <td>${fechaVenc}</td>
-        <td>$${(lote.Costo_Unit || 0).toFixed(2)}</td>
-        <td><span class="badge ${badgeClass}">${estado}</span></td>
-      </tr>
+    let html = `
+        <h2>📦 Inventario por Lotes</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID Lote</th>
+                    <th>Código</th>
+                    <th>Medicamento</th>
+                    <th>N° Lote</th>
+                    <th>Cant. Inicial</th>
+                    <th>Cant. Actual</th>
+                    <th>Fecha Fab.</th>
+                    <th>Fecha Venc.</th>
+                    <th>Costo Unit.</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
     `;
-  });
 
-  html += `
-      </tbody>
-    </table>
-  `;
+    hojas.inventario.forEach((lote) => {
+        // --- Formatear fechas para mostrar ---
+        const fechaFabDisplay = formatearFechaDisplay(lote.Fecha_Fab);
+        const fechaVencDisplay = formatearFechaDisplay(lote.Fecha_Venc);
+        
+        // --- Convertir fecha de vencimiento a Date para cálculos ---
+        const fechaVencimientoReal = parsearFecha(lote.Fecha_Venc);
+        const hoy = new Date();
+        
+        // --- Determinar estado del lote ---
+        let estado = "";
+        let badgeClass = "";
 
-  document.getElementById("contenidoDinamico").innerHTML = html;
+        if (lote.Cant_Actual === 0) {
+            estado = "Agotado";
+            badgeClass = "badge-agotado";
+        } else if (fechaVencimientoReal && fechaVencimientoReal < hoy) {
+            estado = "Vencido";
+            badgeClass = "badge-vencido";
+        } else if (fechaVencimientoReal) {
+            const dias = Math.floor((fechaVencimientoReal - hoy) / (1000 * 60 * 60 * 24));
+            if (dias <= 30) {
+                estado = "Por Vencer";
+                badgeClass = "badge-vencer";
+            } else {
+                estado = "Activo";
+                badgeClass = "badge-activo";
+            }
+        } else {
+            estado = "Activo";
+            badgeClass = "badge-activo";
+        }
+
+        // --- Renderizar la fila ---
+        html += `
+            <tr>
+                <td>${lote.ID_Lote || "—"}</td>
+                <td>${lote.Código_Med || "—"}</td>
+                <td><strong>${lote.Nombre_Med || "—"}</strong></td>
+                <td>${lote.Num_Lote || "—"}</td>
+                <td>${lote.Cant_Inicial || 0}</td>
+                <td><strong>${lote.Cant_Actual || 0}</strong></td>
+                <td>${fechaFabDisplay}</td>
+                <td>${fechaVencDisplay}</td>
+                <td>$${(lote.Costo_Unit || 0).toFixed(2)}</td>
+                <td><span class="badge ${badgeClass}">${estado}</span></td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+    `;
+
+    document.getElementById("contenidoDinamico").innerHTML = html;
+    console.log("✅ Inventario mostrado correctamente");
 }
-
 // ============================================
 // FUNCIÓN AUXILIAR: FORMATEAR Y NORMALIZAR FECHAS
 // ============================================
-function normalizarFecha(fecha) {
-  if (!fecha) return "—";
-
-  // Si es número (serial de Excel)
-  if (typeof fecha === "number") {
-    try {
-      // Excel cuenta desde 1900-01-01
-      const excelBase = new Date(1899, 11, 30);
-      const fechaConvertida = new Date(
-        excelBase.getTime() + fecha * 86400000
-      );
-      return fechaConvertida.toLocaleDateString("es-ES");
-    } catch {
-      return "—";
+// ============================================
+// FUNCIÓN AUXILIAR: CONVERTIR FECHA A OBJETO DATE
+// ============================================
+function parsearFecha(valor) {
+    if (!valor || valor === "—" || valor === "") return null;
+    
+    const texto = String(valor).trim();
+    
+    // Si viene como dd/mm/yyyy (lo más común de tu Excel)
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(texto)) {
+        const [dia, mes, anio] = texto.split('/');
+        return new Date(anio, mes - 1, dia);
     }
-  }
-
-  // Si es tipo string "2025-10-27"
-  if (typeof fecha === "string" && fecha.includes("-")) {
-    const [a, m, d] = fecha.split("-");
-    return `${d}/${m}/${a}`;
-  }
-
-  // Si es una fecha válida en texto
-  const date = new Date(fecha);
-  if (!isNaN(date.getTime())) {
-    return date.toLocaleDateString("es-ES");
-  }
-
-  return "—";
+    
+    // Si viene como ISO (yyyy-mm-dd)
+    if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+        return new Date(texto);
+    }
+    
+    // Si es número serial de Excel
+    if (!isNaN(texto)) {
+        const base = new Date(1899, 11, 30);
+        return new Date(base.getTime() + Number(texto) * 86400000);
+    }
+    
+    return null;
 }
+
+// ============================================
+// FUNCIÓN AUXILIAR: FORMATEAR FECHA PARA MOSTRAR
+// ============================================
+function formatearFechaDisplay(valor) {
+    if (!valor || valor === "—" || valor === "") return "—";
+    
+    const texto = String(valor).trim();
+    
+    // Si ya está en formato dd/mm/yyyy, devolverla tal cual
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(texto)) {
+        return texto;
+    }
+    
+    // Si viene como ISO, convertirla
+    if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
+        const [a, m, d] = texto.split('-');
+        return `${d}/${m}/${a}`;
+    }
+    
+    // Si es número serial de Excel
+    if (!isNaN(texto)) {
+        const base = new Date(1899, 11, 30);
+        const fecha = new Date(base.getTime() + Number(texto) * 86400000);
+        const dia = String(fecha.getDate()).padStart(2, '0');
+        const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+        const anio = fecha.getFullYear();
+        return `${dia}/${mes}/${anio}`;
+    }
+    
+    return texto;
+}
+
 
 // ============================================
 // VER LIBRO DIARIO
@@ -575,22 +587,4 @@ function exportarMayorExcel() {
     XLSX.writeFile(wb, "Libro_Mayor_Actualizado.xlsx");
     alert('✅ Libro Mayor exportado correctamente.');
 }
-if (typeof formatearFecha === 'undefined') {
-    function formatearFecha(valor) {
-        if (!valor || valor === "null" || valor === "") return "—";
-        const texto = String(valor).trim();
 
-        if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(texto)) return texto;
-
-        if (/^\d{4}-\d{2}-\d{2}/.test(texto)) {
-            const [y, m, d] = texto.split("-");
-            return `${d}/${m}/${y}`;
-        }
-
-        if (!isNaN(texto)) {
-            return procesarFecha(Number(texto));
-        }
-
-        return texto;
-    }
-}
