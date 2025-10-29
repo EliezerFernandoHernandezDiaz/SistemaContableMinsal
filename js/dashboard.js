@@ -296,7 +296,7 @@ function verInventario() {
                 <td><strong>${formatearNumero(lote.Cant_Actual || 0)}</strong></td>
                 <td>${fechaFabDisplay}</td>
                 <td>${fechaVencDisplay}</td>
-                <td>$${(lote.Costo_Unit || 0).toFixed(2)}</td>
+                <td>${formatearDinero(lote.Costo_Unit || 0)}</td>
                 <td><span class="badge ${badgeClass}">${estado}</span></td>
             </tr>
         `;
@@ -558,7 +558,7 @@ function verLibroMayor() {
     // Botones de acción
     html += `
         <div style="margin-top:30px; text-align:center;">
-            <button class="btn-secondary" onclick="mostrarDashboard()">⬅️ Volver</button>
+            <button onclick="location.reload()">⬅️ Volver</button>
             <button class="btn-success" onclick="exportarMayorExcel()">💾 Exportar Libro Mayor</button>
         </div>
     `;

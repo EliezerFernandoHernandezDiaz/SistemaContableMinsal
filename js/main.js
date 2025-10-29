@@ -423,12 +423,47 @@ function cargarArchivo() {
 // FUNCIONES AUXILIARES
 // ============================================
 
+// ============================================
+// GENERAR ID DE LOTE ÚNICO
+// ============================================
 function generarIDLote() {
-    if (hojas.inventario.length === 0) return 'L001';
-    const ultimoID = hojas.inventario[hojas.inventario.length - 1].ID_Lote;
-    const numero = parseInt(ultimoID.substring(1)) + 1;
-    return 'L' + numero.toString().padStart(3, '0');
+    console.log('🔍 Generando ID_Lote...');
+    
+    // Si no hay inventario, empezar en L001
+    if (!hojas.inventario || hojas.inventario.length === 0) {
+        console.log('  ✅ Primer lote: L001');
+        return 'L001';
+    }
+    
+    let maxNum = 0;
+    
+    hojas.inventario.forEach((lote, index) => {
+        const idLote = String(lote.ID_Lote || '').trim();
+        
+        // Buscar patrón: L001, L002, L999, etc.
+        const match = idLote.match(/^L(\d+)$/);
+        
+        if (match) {
+            const num = parseInt(match[1], 10);
+            console.log(`  - Lote ${index}: ${idLote} → ${num}`);
+            
+            if (!isNaN(num) && num > maxNum) {
+                maxNum = num;
+            }
+        } else {
+            console.log(`  ⚠️ Lote ${index} con ID inválido: "${idLote}"`);
+        }
+    });
+    
+    const nuevoNum = maxNum + 1;
+    const resultado = `L${String(nuevoNum).padStart(3, '0')}`;
+    
+    console.log(`  ✅ Máximo encontrado: ${maxNum}`);
+    console.log(`  ✅ Nuevo ID_Lote: ${resultado}`);
+    
+    return resultado;
 }
+
 
 function obtenerUltimoAsiento() {
     if (hojas.diario.length === 0) return 0;

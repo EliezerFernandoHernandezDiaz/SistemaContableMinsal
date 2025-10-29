@@ -1,3 +1,4 @@
+
 // ============================================
 // MAPEO: MEDICAMENTO → PROVEEDOR
 // ============================================
@@ -362,7 +363,7 @@ function registrarCompra() {
             Cant_Actual: datos.cantidad,
             Fecha_Fab: formatearFecha(new Date(datos.fechaFab)),
             Fecha_Venc: formatearFecha(new Date(datos.fechaVenc)),
-            Costo_Unit: parseFloat(datos.precio).toFixed(2),
+            Costo_Unit: parseFloat(datos.precio),
             Estado: 'Activo'
         };
         hojas.inventario.push(nuevoLote);

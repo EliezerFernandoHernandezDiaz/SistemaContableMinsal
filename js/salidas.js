@@ -1,3 +1,23 @@
+//Funcion para generar el numero de despacho automaticamente
+function generarNumeroDespacho(){
+    let ultimoNum=0; 
+    //Buscar el ultimo numero de despacho en las salidas 
+      hojas.salidas.forEach(salida => {
+        const numDespacho = salida.Num_Despacho || '';
+        const match = numDespacho.match(/D-(\d+)/); // Extrae el número después de D-
+        if (match) {
+            const num = parseInt(match[1]);
+            if (num > ultimoNum) ultimoNum = num;
+        }
+    });
+    
+    // Incrementar y formatear con 5 dígitos
+    const nuevoNum = ultimoNum + 1;
+    return `D-${String(nuevoNum).padStart(5, '0')}`; // D-00001, D-00002, etc.
+}
+
+
+
 // ============================================
 // FUNCIÓN AUXILIAR: FORMATEAR FECHA + HORA
 // ============================================
@@ -21,7 +41,7 @@ function formatearFechaHora(fecha) {
 
 function mostrarFormularioSalida() {
     console.log('📤 Mostrando formulario de salidas...');
-    
+    const numDespachoAuto= generarNumeroDespacho();
     const html = `
         <div class="formulario-salida">
             <h2>📤 Registrar Nuevo Despacho</h2>
@@ -35,8 +55,13 @@ function mostrarFormularioSalida() {
                     </div>
                     
                     <div class="form-group">
-                        <label>N° de Despacho *</label>
-                        <input type="text" id="numDespacho" placeholder="D-00125" required>
+                        <label for="numDespacho">N° de Despacho *</label>
+                        <input type="text" 
+                            id="numDespacho" 
+                            value="${generarNumeroDespacho()}" 
+                            readonly 
+                            style="background:#f0f0f0; cursor:not-allowed;"
+                            required>
                     </div>
                 </div>
                 
