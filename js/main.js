@@ -11,8 +11,8 @@ let hojas = {
     mayor: []
 };
 
-// ============================================
-// FUNCIÓN PARA CONVERTIR FECHAS DE EXCEL
+
+// FUNCIÓN MEJORADA PARA PROCESAR FECHAS (VERSIÓN DEFINITIVA)
 // ============================================
 // ============================================
 // FUNCIÓN MEJORADA PARA PROCESAR FECHAS (VERSIÓN DEFINITIVA)
@@ -20,26 +20,47 @@ let hojas = {
 function procesarFecha(fecha) {
     // Si es null, undefined o vacío
     if (fecha === null || fecha === undefined || fecha === '' || fecha === 'null') {
+        console.log('⚠️ Fecha nula o vacía');
         return null;
     }
     
-    // Si ya es una cadena con formato dd/mm/yyyy o dd/mm/yy
+    // Si ya es una cadena con formato dd/mm/yyyy HH:MM:SS (CON HORA)
     if (typeof fecha === 'string') {
-        // Formato dd/mm/yyyy o dd/mm/yy
+        // Limpiar espacios y caracteres invisibles
+        fecha = fecha.trim().replace(/\u00A0/g, ' ');
+        
+        // Formato con hora: dd/mm/yyyy HH:MM:SS
+        if (fecha.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}\s+\d{1,2}:\d{1,2}(:\d{1,2})?$/)) {
+            console.log('✅ Fecha con hora detectada:', fecha);
+            return fecha; // Mantener formato completo
+        }
+        
+        // Formato solo fecha: dd/mm/yyyy o dd/mm/yy
         if (fecha.match(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/)) {
+            console.log('✅ Fecha sin hora detectada:', fecha);
             return fecha;
         }
         
         // Formato yyyy-mm-dd (ISO)
         if (fecha.match(/^\d{4}-\d{2}-\d{2}/)) {
-            const partes = fecha.split('-');
-            return `${partes[2].substring(0,2)}/${partes[1]}/${partes[0]}`;
+            const partes = fecha.split(/[\sT-]/); // Separar por espacio, T, o guión
+            const dia = partes[2].substring(0,2).padStart(2, '0');
+            const mes = partes[1].padStart(2, '0');
+            const anio = partes[0];
+            
+            // Si tiene hora, extraerla
+            if (fecha.includes(' ') || fecha.includes('T')) {
+                const hora = fecha.split(/[\sT]/)[1]?.substring(0, 8) || '00:00:00';
+                return `${dia}/${mes}/${anio} ${hora}`;
+            }
+            
+            return `${dia}/${mes}/${anio}`;
         }
         
         // Formato dd-mm-yyyy
         if (fecha.match(/^\d{1,2}-\d{1,2}-\d{4}$/)) {
             const partes = fecha.split('-');
-            return `${partes[0]}/${partes[1]}/${partes[2]}`;
+            return `${partes[0].padStart(2,'0')}/${partes[1].padStart(2,'0')}/${partes[2]}`;
         }
     }
     
@@ -48,6 +69,15 @@ function procesarFecha(fecha) {
         const dia = String(fecha.getDate()).padStart(2, '0');
         const mes = String(fecha.getMonth() + 1).padStart(2, '0');
         const anio = fecha.getFullYear();
+        const hora = String(fecha.getHours()).padStart(2, '0');
+        const min = String(fecha.getMinutes()).padStart(2, '0');
+        const seg = String(fecha.getSeconds()).padStart(2, '0');
+        
+        // Si tiene hora diferente de 00:00:00, incluirla
+        if (hora !== '00' || min !== '00' || seg !== '00') {
+            return `${dia}/${mes}/${anio} ${hora}:${min}:${seg}`;
+        }
+        
         return `${dia}/${mes}/${anio}`;
     }
     
@@ -56,15 +86,28 @@ function procesarFecha(fecha) {
         try {
             // Fórmula de conversión de Excel serial date
             const excelEpoch = new Date(1899, 11, 30);
-            const dias = Math.floor(fecha);
-            const fechaConvertida = new Date(excelEpoch.getTime() + dias * 86400000);
+            const diasCompletos = Math.floor(fecha);
+            const fraccionDia = fecha - diasCompletos;
+            
+            const fechaConvertida = new Date(excelEpoch.getTime() + diasCompletos * 86400000);
             
             const dia = String(fechaConvertida.getDate()).padStart(2, '0');
             const mes = String(fechaConvertida.getMonth() + 1).padStart(2, '0');
             const anio = fechaConvertida.getFullYear();
+            
+            // Si hay fracción (hora), calcularla
+            if (fraccionDia > 0) {
+                const totalSegundos = Math.round(fraccionDia * 86400);
+                const horas = Math.floor(totalSegundos / 3600);
+                const minutos = Math.floor((totalSegundos % 3600) / 60);
+                const segundos = totalSegundos % 60;
+                
+                return `${dia}/${mes}/${anio} ${String(horas).padStart(2,'0')}:${String(minutos).padStart(2,'0')}:${String(segundos).padStart(2,'0')}`;
+            }
+            
             return `${dia}/${mes}/${anio}`;
         } catch (e) {
-            console.warn('Error convirtiendo número serial:', fecha, e);
+            console.warn('❌ Error convirtiendo número serial:', fecha, e);
         }
     }
     
@@ -78,9 +121,10 @@ function procesarFecha(fecha) {
             return `${dia}/${mes}/${anio}`;
         }
     } catch (e) {
-        console.warn('No se pudo procesar la fecha:', fecha);
+        console.warn('❌ No se pudo procesar la fecha:', fecha);
     }
     
+    console.warn('❌ Fecha no procesable:', fecha);
     return null;
 }
 
@@ -329,40 +373,6 @@ function cargarArchivo() {
                 ...asiento,
                 Fecha: procesarFecha(asiento.Fecha)
             }));
-            // ============================================
-            // Normalizar claves y convertir fechas después de leer las hojas
-            // ============================================
-
-            // 1️⃣ Normalizar claves de cada fila
-            hojas.catalogo   = hojas.catalogo.map(normalizarClavesFila);
-            hojas.inventario = hojas.inventario.map(normalizarClavesFila);
-            hojas.compras    = hojas.compras.map(normalizarClavesFila);
-            hojas.salidas    = hojas.salidas.map(normalizarClavesFila);
-            hojas.diario     = hojas.diario.map(normalizarClavesFila);
-            hojas.mayor      = hojas.mayor.map(normalizarClavesFila);
-
-            // 2️⃣ Normalizar / convertir fechas
-            hojas.inventario = hojas.inventario.map(l => ({
-                ...l,
-                Fecha_Fab:  procesarFecha(l.Fecha_Fab),
-                Fecha_Venc: procesarFecha(l.Fecha_Venc)
-            }));
-
-            hojas.compras = hojas.compras.map(r => ({
-                ...r,
-                Fecha: procesarFecha(r.Fecha)
-            }));
-
-            hojas.salidas = hojas.salidas.map(r => ({
-                ...r,
-                Fecha: procesarFecha(r.Fecha)
-            }));
-
-            hojas.diario = hojas.diario.map(r => ({
-                ...r,
-                Fecha: procesarFecha(r.Fecha)
-            }));
-
             // Debug para verificar fechas cargadas correctamente
             console.log('🧹 Fechas normalizadas en Inventario:',
                 hojas.inventario

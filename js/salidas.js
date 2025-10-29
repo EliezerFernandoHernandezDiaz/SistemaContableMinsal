@@ -329,17 +329,31 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
         };
     }
 
-// ============================================
-// REGISTRAR SALIDA
-// ============================================
+
 // ============================================
 // REGISTRAR SALIDA (VERSIÓN CORREGIDA)
 // ============================================
+
+// Al inicio de registrarSalida()
+const fechaInput = document.getElementById('fechaSalida').value; // "2025-10-29"
+const [anio, mes, dia] = fechaInput.split('-');
+const fechaFormateada = `${dia}/${mes}/${anio}`; // "29/10/2025"
+
+const datos = {
+    fecha: new Date(),
+    fechaFormateada: fechaFormateada, // ✅ "29/10/2025"
+    fechaHoraCompleta: formatearFechaHora(new Date()), // "29/10/2025 18:30:45"
+    numDespacho: document.getElementById('numDespacho').value.trim(),
+    // ...
+};
+
 function registrarSalida() {
     
     // 1. PRIMERO: Obtener datos del formulario
     const datos = {
-        fecha: new Date(),
+         fecha: new Date(),
+        fechaSoloFecha: document.getElementById('fechaSalida').value, // ✅ Solo fecha del input
+        fechaHoraCompleta: formatearFechaHora(new Date()), // Para mostrar en alertas
         numDespacho: document.getElementById('numDespacho').value.trim(),
         hospital: document.getElementById('hospitalDestino').value,
         codigoMed: document.getElementById('medicamentoSalida').value,
@@ -416,7 +430,7 @@ function registrarSalida() {
     const total = Number((cantidad * costoUnit).toFixed(2));
 
         hojas.salidas.push({
-        Fecha: formatearFechaHora(datos.fecha),
+         Fecha: datos.fechaSoloFecha, // ✅ Solo fecha: 29/10/2025
         Num_Despacho: datos.numDespacho,
         Hospital_Destino: datos.hospital,
         Código_Med: datos.codigoMed,
@@ -437,7 +451,7 @@ function registrarSalida() {
         
         // Asiento 1: Debe - Costo de medicamentos despachados
         hojas.diario.push({
-            Fecha: formatearFechaHora(datos.fecha),
+            Fecha: datos.fechaSoloFecha,
             Num_Asiento: numAsiento,
             Descripción: descripcion, 
             Cuenta: 'Costo de medicamentos despachados', 
@@ -447,25 +461,29 @@ function registrarSalida() {
         
         // Asiento 2: Haber - Inventario 
         hojas.diario.push({
-            Fecha: formatearFechaHora(datos.fecha),
+            Fecha:datos.fechaSoloFecha,
             Num_Asiento: numAsiento,
             Descripción: descripcion,
             Cuenta: 'Inventario de Medicamentos',
             Debe: 0,
             Haber: resultado.costoTotal
         });
+        // 🔍 DEBUG: Verificar qué se guardó
+            console.log('🔍 DEBUG - Fecha guardada en Diario:', datos.fechaHoraFormateada);
+            console.log('🔍 DEBUG - Tipo de fecha:', typeof datos.fechaHoraFormateada);
+            console.log('🔍 DEBUG - Último asiento del diario:', hojas.diario[hojas.diario.length - 1]);
         
-        // 8. MOSTRAR resultado
-        console.log('✅ Salida registrada exitosamente');
-        console.log('  - Lotes utilizados:', resultado.despachos.length);
-        console.log('  - Costo total: $' + resultado.costoTotal.toFixed(2));
-        console.log('  - Asiento contable:', numAsiento);
-        
-        // 9. Actualizar dashboard y verificar alertas
-        if (typeof recalcAll === 'function') recalcAll();
-        if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
+            // 8. MOSTRAR resultado
+            console.log('✅ Salida registrada exitosamente');
+            console.log('  - Lotes utilizados:', resultado.despachos.length);
+            console.log('  - Costo total: $' + resultado.costoTotal.toFixed(2));
+            console.log('  - Asiento contable:', numAsiento);
+            
+            // 9. Actualizar dashboard y verificar alertas
+            if (typeof recalcAll === 'function') recalcAll();
+            if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
 
-        
+            
         mostrarDashboard();
         verificarAlertas();
 
