@@ -11,6 +11,13 @@ function verReportes() {
             <p>Selecciona el tipo de reporte que deseas generar:</p>
             
             <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap:20px; margin:30px 0;">
+                 <!-- ✅ NUEVO: Reportes Contables -->
+                <div class="tarjeta-reporte" onclick="verReportesContables()" 
+                     style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                    <div style="font-size:3em;">💼</div>
+                    <h3 style="color: white;">Reportes Contables</h3>
+                    <p style="color: #f0f0f0;">Estados financieros profesionales</p>
+                </div>
                 
                 <div class="tarjeta-reporte" onclick="reporteMedicamentosCriticos()">
                     <div style="font-size:3em;">🔴</div>
