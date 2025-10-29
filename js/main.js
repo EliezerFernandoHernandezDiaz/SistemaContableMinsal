@@ -136,6 +136,7 @@ function _canonKey(k) {
     .toLowerCase();
 }
 
+
 // Mapea nombres “parecidos” a los oficiales
 function normalizarClavesFila(row) {
   const map = {

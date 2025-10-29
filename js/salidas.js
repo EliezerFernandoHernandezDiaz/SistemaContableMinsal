@@ -275,30 +275,34 @@ function aplicarPEPS(codigoMed, cantidadSolicitada) {
     for (let lote of lotesDisponibles) {
         if (restante === 0) break;
         
+       // Asegurar conversión numérica del costo unitario
+        const costoUnit = Number(String(lote.Costo_Unit).replace(/[^0-9.-]+/g, "")) || 0;
         const aTomar = Math.min(restante, lote.Cant_Actual);
-        
         despachos.push({
-            idLote: lote.ID_Lote,
-            numLote: lote.Num_Lote,
-            cantidad: aTomar,
-            costoUnit: lote.Costo_Unit || 0,
-            costoTotal: aTomar * (lote.Costo_Unit || 0),
-            fechaVenc: lote.Fecha_Venc || 'Sin fecha'
+        idLote: lote.ID_Lote,
+        numLote: lote.Num_Lote,
+        cantidad: aTomar,
+        costoUnit: costoUnit,
+        costoTotal: Number((aTomar * costoUnit).toFixed(2)),
+        fechaVenc: lote.Fecha_Venc || 'Sin fecha'
         });
-        
         restante -= aTomar;
     }
     
-    const costoTotal = despachos.reduce((sum, d) => sum + d.costoTotal, 0);
-    
-    console.log('✅ PEPS calculado:', despachos);
-    
-    return {
-        error: false,
-        despachos: despachos,
-        costoTotal: costoTotal
-    };
-}
+    // Redondear correctamente el total (2 decimales y tipo numérico)
+    const costoTotal = Number(
+    despachos.reduce((sum, d) => sum + d.costoTotal, 0).toFixed(2)
+  
+    );
+
+         console.log('✅ PEPS calculado:', despachos);
+
+         return {
+         error: false,
+    despachos: despachos,
+    costoTotal: costoTotal
+        };
+    }
 
 // ============================================
 // REGISTRAR SALIDA
@@ -362,6 +366,7 @@ function registrarSalida() {
         
         if (resultado.error) {
             alert('❌ ' + resultado.mensaje);
+            
             return;
         }
         
@@ -379,21 +384,28 @@ function registrarSalida() {
                 }
             }
         });
-           resultado.despachos.forEach(desp => {
-            hojas.salidas.push({
-                
-            Fecha: formatearFechaHora(datos.fecha),
-            Num_Despacho: datos.numDespacho,
-            Hospital_Destino: datos.hospital,
-            Código_Med: datos.codigoMed,
-            Nombre_Med: medicamento.Nombre,
-            Num_Lote: desp.numLote,
-            Cantidad_Despachada: desp.cantidad,              // ⬅️ SIN formatear (número puro)
-            Costo_Unit: desp.costoUnit || 0,                 // ⬅️ SIN formatear
-            Total: desp.costoTotal || 0,                     // ⬅️ SIN formatear
-            Responsable: datos.responsable
+        // 6. Registrar cada despacho en Libro_Salidas (versión corregida)
+    resultado.despachos.forEach(desp => {
+    const cantidad = Number(desp.cantidad || 0);
+    const costoUnit = Number(desp.costoUnit || 0);
+    const total = Number((cantidad * costoUnit).toFixed(2));
+
+        hojas.salidas.push({
+        Fecha: formatearFechaHora(datos.fecha),
+        Num_Despacho: datos.numDespacho,
+        Hospital_Destino: datos.hospital,
+        Código_Med: datos.codigoMed,
+        Nombre_Med: medicamento.Nombre,
+        Num_Lote: desp.numLote,
+        Cantidad_Despachada: cantidad,
+        Costo_Unit: costoUnit,
+        Total: total,
+        Responsable: datos.responsable
     });
-});
+
+    console.log(`💰 Cálculo verificado: ${cantidad} × ${costoUnit} = ${total}`);
+    });
+
         // 7. Generar asientos contables
         const numAsiento = obtenerUltimoAsiento() + 1;
         const descripcion = `Despacho ${datos.hospital} - ${datos.numDespacho}`;

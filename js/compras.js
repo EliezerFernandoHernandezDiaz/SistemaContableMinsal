@@ -1,9 +1,160 @@
 // ============================================
-// MÓDULO DE COMPRAS
+// MAPEO: MEDICAMENTO → PROVEEDOR
 // ============================================
+const medicamentoProveedor = {
+    'MED-001': 'Laboratorios Unidos SA',
+    'MED-002': 'Farma Central',
+    'MED-003': 'Distribuidora Médica',
+    'MED-004': 'Droguería El Salvador',
+    'MED-005': 'BioPharma S.A. de C.V.',
+    'MED-006': 'Laboratorios Lopez',
+    'MED-007': 'Laboratorios Suizos',
+    'MED-008': 'Farmacéutica Panamericana',
+    'MED-009': 'Laboratorios Cofasa',
+    'MED-010': 'Droguería Santa Lucía',
+    'MED-011': 'Laboratorios Bonima',
+    'MED-012': 'Farmadistr S.A.',
+    'MED-013': 'Laboratorios Stein',
+    'MED-014': 'Distribuidora Farmacéutica del Norte',
+    'MED-015': 'Laboratorios Pailyn',
+    'MED-016': 'Laboratorios Baxter',
+    'MED-017': 'Droguería Farmedic',
+    'MED-018': 'Laboratorios Chinoin',
+    'MED-019': 'Medisurv S.A. de C.V.',
+    'MED-020': 'Laboratorios Baxter'
+};
 
+// ============================================
+// GENERAR NÚMERO DE FACTURA AUTOMÁTICO
+// ============================================
+function generarNumeroFactura() {
+    let ultimoNum = 0;
+    
+    hojas.compras.forEach(compra => {
+        const numFactura = compra.Num_Factura || '';
+        const match = numFactura.match(/F-(\d+)/);
+        if (match) {
+            const num = parseInt(match[1]);
+            if (num > ultimoNum) ultimoNum = num;
+        }
+    });
+    
+    const nuevoNum = ultimoNum + 1;
+    return `F-${String(nuevoNum).padStart(6, '0')}`;
+}
+
+
+// ============================================
+// GENERAR NÚMERO DE LOTE AUTOMÁTICO
+// ============================================
+function generarNumeroLote() {
+    const anioActual = new Date().getFullYear();
+    let ultimoNum = 0;
+    
+    // Buscar el último número de lote del año actual
+    hojas.inventario.forEach(lote => {
+        const numLote = lote.Num_Lote || '';
+        // Buscar patrón: LOT-2025-001, LOT-2025-002, etc.
+        const match = numLote.match(/LOT-(\d{4})-(\d+)/);
+        
+        if (match) {
+            const anioLote = parseInt(match[1]);
+            const numSecuencial = parseInt(match[2]);
+            
+            // Solo contar lotes del año actual
+            if (anioLote === anioActual && numSecuencial > ultimoNum) {
+                ultimoNum = numSecuencial;
+            }
+        }
+    });
+    
+    // Incrementar y formatear con 3 dígitos
+    const nuevoNum = ultimoNum + 1;
+    return `LOT-${anioActual}-${String(nuevoNum).padStart(3, '0')}`;
+}
+
+// ============================================
+// ACTUALIZAR INFO AL SELECCIONAR MEDICAMENTO
+// ============================================
+function actualizarInfoCompra() {
+    const select = document.getElementById('medicamento');
+    if (!select) return;
+    
+    const codigoMed = select.value;
+    
+    if (!codigoMed) {
+        document.getElementById('proveedor').value = '';
+        document.getElementById('precioUnit').value = '';
+        document.getElementById('infoMedicamento').style.display = 'none';
+        return;
+    }
+    
+    const medicamento = hojas.catalogo.find(m => m.Código === codigoMed);
+    if (!medicamento) return;
+    
+    // Asignar proveedor automáticamente
+    const proveedor = medicamentoProveedor[codigoMed] || 'Proveedor no asignado';
+    document.getElementById('proveedor').value = proveedor;
+    
+    // Asignar precio unitario (con 2 decimales)
+    const precioUnit = (medicamento.Precio_Unit || 0).toFixed(2);
+    document.getElementById('precioUnit').value = precioUnit;
+    
+    // Calcular stock disponible
+    const stockTotal = hojas.inventario
+        .filter(l => l.Código_Med === codigoMed)
+        .reduce((sum, l) => sum + (l.Cant_Actual || 0), 0);
+    
+    // Mostrar info
+    const html = `
+        <h4 style="margin-top:0;">ℹ️ Información del Medicamento</h4>
+        <p><strong>📦 Medicamento:</strong> ${medicamento.Nombre}</p>
+        <p><strong>🏭 Proveedor asignado:</strong> ${proveedor}</p>
+        <p><strong>💰 Precio unitario:</strong> $${precioUnit}</p>
+        <p><strong>📊 Stock actual:</strong> ${formatearNumero(stockTotal)} unidades</p>
+        <p><strong>📈 Stock mínimo:</strong> ${formatearNumero(medicamento.Stock_Min || 0)}</p>
+        <p><strong>📉 Stock máximo:</strong> ${formatearNumero(medicamento.Stock_Max || 0)}</p>
+    `;
+    
+    document.getElementById('infoMedicamento').innerHTML = html;
+    document.getElementById('infoMedicamento').style.display = 'block';
+    
+    // Recalcular totales
+    calcularTotalCompra();
+}
+
+// ============================================
+// CALCULAR TOTAL DE LA COMPRA
+// ============================================
+function calcularTotalCompra() {
+    const cantidad = parseFloat(document.getElementById('cantidadCompra')?.value) || 0;
+    const precio = parseFloat(document.getElementById('precioUnit')?.value) || 0;
+    
+    if (cantidad <= 0 || precio <= 0) {
+        document.getElementById('subtotalCompra').textContent = '$0.00';
+        document.getElementById('ivaCompra').textContent = '$0.00';
+        document.getElementById('totalCompra').textContent = '$0.00';
+        return;
+    }
+    
+    const subtotal = cantidad * precio;
+    const iva = subtotal * 0.13;
+    const total = subtotal + iva;
+    
+    document.getElementById('subtotalCompra').textContent = formatearDinero(subtotal);
+    document.getElementById('ivaCompra').textContent = formatearDinero(iva);
+    document.getElementById('totalCompra').textContent = formatearDinero(total);
+}
+
+// ============================================
+// MOSTRAR FORMULARIO DE COMPRA
+// ============================================
 function mostrarFormularioCompra() {
     console.log('📥 Mostrando formulario de compras...');
+    
+    const numFacturaAuto = generarNumeroFactura();
+    const numloteAuto= generarNumeroLote();
+    const fechaHoy = new Date().toISOString().slice(0, 10);
     
     const html = `
         <div class="formulario-compra">
@@ -14,30 +165,34 @@ function mostrarFormularioCompra() {
                 <div class="form-row">
                     <div class="form-group">
                         <label>Fecha de Compra *</label>
-                        <input type="date" id="fechaCompra" value="${new Date().toISOString().slice(0,10)}" required>
+                        <input type="date" id="fechaCompra" value="${fechaHoy}" required>
                     </div>
                     
                     <div class="form-group">
                         <label>N° de Factura *</label>
-                        <input type="text" id="numFactura" placeholder="F-001234" required>
+                        <input type="text" 
+                               id="numFactura" 
+                               value="${numFacturaAuto}" 
+                               readonly 
+                               style="background:#f0f0f0; cursor:not-allowed;"
+                               required>
                     </div>
                 </div>
                 
                 <div class="form-group">
-                    <label>Proveedor *</label>
-                    <select id="proveedor" required>
-                        <option value="">-- Seleccionar --</option>
-                        <option value="Laboratorios Unidos SA">Laboratorios Unidos SA</option>
-                        <option value="Farma Central">Farma Central</option>
-                        <option value="Distribuidora Médica">Distribuidora Médica</option>
-                        <option value="Pharma International">Pharma International</option>
-                        <option value="Medicamentos y Equipos SA">Medicamentos y Equipos SA</option>
-                    </select>
+                    <label for="proveedor">Proveedor *</label>
+                    <input type="text" 
+                        id="proveedor" 
+                        readonly 
+                        value=""
+                        placeholder="Se asignará al seleccionar medicamento"
+                        style="background:#f0f0f0; cursor:not-allowed;"
+                        required>
                 </div>
                 
                 <div class="form-group">
                     <label>Medicamento *</label>
-                    <select id="medicamentoCompra" onchange="mostrarInfoMedicamento()" required>
+                    <select id="medicamento" required>
                         <option value="">-- Seleccionar --</option>
                         ${hojas.catalogo.map(med => 
                             `<option value="${med.Código}">${med.Código} - ${med.Nombre}</option>`
@@ -46,10 +201,7 @@ function mostrarFormularioCompra() {
                 </div>
                 
                 <!-- Info del medicamento -->
-                <div id="infoMedicamento" style="display:none; background:#e3f2fd; padding:15px; border-radius:8px; margin:15px 0;">
-                    <h4 style="margin-top:0;">ℹ️ Información del Medicamento</h4>
-                    <div id="detallesMedicamento"></div>
-                </div>
+                <div id="infoMedicamento" style="display:none; background:#e3f2fd; padding:15px; border-radius:8px; margin:15px 0;"></div>
                 
                 <div class="form-row">
                     <div class="form-group">
@@ -59,16 +211,27 @@ function mostrarFormularioCompra() {
                     
                     <div class="form-group">
                         <label>Precio Unitario *</label>
-                        <input type="number" id="precioCompra" step="0.01" min="0" placeholder="45.00" required>
+                        <input type="text" 
+                            id="precioUnit" 
+                            readonly 
+                            value=""
+                            placeholder="Se asignará automáticamente"
+                            style="background:#f0f0f0; cursor:not-allowed; text-align:right;"
+                            required>
                     </div>
                 </div>
                 
                 <div class="form-row">
-                    <div class="form-group">
-                        <label>N° de Lote *</label>
-                        <input type="text" id="numLote" placeholder="LOT-2025-001" required>
-                    </div>
-                    
+                  <div class="form-group">
+                    <label>N° de Lote *</label>
+                    <input type="text" 
+                        id="numLote" 
+                        value="${generarNumeroLote()}" 
+                        readonly 
+                        style="background:#f0f0f0; cursor:not-allowed;"
+                        required>
+                </div>
+                                    
                     <div class="form-group">
                         <label>Fecha de Fabricación *</label>
                         <input type="date" id="fechaFab" required>
@@ -104,80 +267,32 @@ function mostrarFormularioCompra() {
     
     document.getElementById('contenidoDinamico').innerHTML = html;
     
-    // Event listeners para calcular total en tiempo real
-    document.getElementById('cantidadCompra').addEventListener('input', calcularTotalCompra);
-    document.getElementById('precioCompra').addEventListener('input', calcularTotalCompra);
-}
-
-// ============================================
-// MOSTRAR INFO DEL MEDICAMENTO SELECCIONADO
-// ============================================
-function mostrarInfoMedicamento() {
-    const codigoMed = document.getElementById('medicamentoCompra').value;
-    
-    if (!codigoMed) {
-        document.getElementById('infoMedicamento').style.display = 'none';
-        return;
-    }
-    
-    const medicamento = buscarMedicamento(codigoMed);
-    
-    if (!medicamento) return;
-    
-    // Calcular stock actual
-    const stockActual = hojas.inventario
-        .filter(lote => lote.Código_Med === codigoMed)
-        .reduce((sum, lote) => sum + (lote.Cant_Actual || 0), 0);
-    
-    const html = `
-        <p><strong>Nombre:</strong> ${medicamento.Nombre}</p>
-        <p><strong>Presentación:</strong> ${medicamento.Presentacion || ''} ${medicamento.Concentración || ''}</p>
-        <p><strong>Clasificación ABC:</strong> <span class="badge badge-${medicamento.Clase_ABC.toLowerCase()}">${medicamento.Clase_ABC}</span></p>
-        <p><strong>Precio unitario sugerido:</strong> $${(medicamento.Precio_Unit || 0).toFixed(2)}</p>
-        <p><strong>Stock actual:</strong> ${stockActual} unidades</p>
-        <p><strong>Stock mínimo:</strong> ${medicamento.Stock_Min} unidades</p>
-        ${stockActual < medicamento.Stock_Min ? 
-            '<p style="color:red; font-weight:bold;">⚠️ Stock por debajo del mínimo - Compra recomendada</p>' : 
-            '<p style="color:green;">✅ Stock adecuado</p>'
+    // Event listeners DESPUÉS de insertar HTML
+    setTimeout(() => {
+        const selectMed = document.getElementById('medicamento');
+        const inputCantidad = document.getElementById('cantidadCompra');
+        
+        if (selectMed) {
+            selectMed.addEventListener('change', actualizarInfoCompra);
         }
-    `;
-    
-    document.getElementById('detallesMedicamento').innerHTML = html;
-    document.getElementById('infoMedicamento').style.display = 'block';
-    
-    // Auto-llenar precio sugerido
-    document.getElementById('precioCompra').value = medicamento.Precio_Unit || '';
-    calcularTotalCompra();
-}
-
-// ============================================
-// CALCULAR TOTAL DE LA COMPRA
-// ============================================
-function calcularTotalCompra() {
-    const cantidad = parseFloat(document.getElementById('cantidadCompra').value) || 0;
-    const precio = parseFloat(document.getElementById('precioCompra').value) || 0;
-    
-    const subtotal = cantidad * precio;
-    const iva = subtotal * 0.13;
-    const total = subtotal + iva;
-    
-    document.getElementById('subtotalCompra').textContent = '$' + subtotal.toFixed(2);
-    document.getElementById('ivaCompra').textContent = '$' + iva.toFixed(2);
-    document.getElementById('totalCompra').textContent = '$' + total.toFixed(2);
+        
+        if (inputCantidad) {
+            inputCantidad.addEventListener('input', calcularTotalCompra);
+        }
+    }, 100);
 }
 
 // ============================================
 // REGISTRAR LA COMPRA
 // ============================================
 function registrarCompra() {
-    // Obtener datos del formulario
     const datos = {
         fecha: document.getElementById('fechaCompra').value,
         numFactura: document.getElementById('numFactura').value.trim(),
         proveedor: document.getElementById('proveedor').value,
-        codigoMed: document.getElementById('medicamentoCompra').value,
+        codigoMed: document.getElementById('medicamento').value,
         cantidad: parseInt(document.getElementById('cantidadCompra').value),
-        precio: parseFloat(document.getElementById('precioCompra').value),
+        precio: parseFloat(document.getElementById('precioUnit').value),
         numLote: document.getElementById('numLote').value.trim(),
         fechaFab: document.getElementById('fechaFab').value,
         fechaVenc: document.getElementById('fechaVenc').value
@@ -189,8 +304,8 @@ function registrarCompra() {
         return;
     }
     
-    if (!datos.proveedor) {
-        alert('❌ Debe seleccionar un proveedor');
+    if (!datos.proveedor || datos.proveedor === 'Se asignará al seleccionar medicamento') {
+        alert('❌ Debe seleccionar un medicamento primero');
         return;
     }
     
@@ -199,12 +314,12 @@ function registrarCompra() {
         return;
     }
     
-    if (datos.cantidad <= 0) {
+    if (isNaN(datos.cantidad) || datos.cantidad <= 0) {
         alert('❌ La cantidad debe ser mayor a 0');
         return;
     }
     
-    if (datos.precio <= 0) {
+    if (isNaN(datos.precio) || datos.precio <= 0) {
         alert('❌ El precio debe ser mayor a 0');
         return;
     }
@@ -217,10 +332,9 @@ function registrarCompra() {
     // Validar fechas
     const fechaFab = new Date(datos.fechaFab);
     const fechaVenc = new Date(datos.fechaVenc);
-    const hoy = new Date();
     
     if (fechaVenc <= fechaFab) {
-        alert('❌ La fecha de vencimiento debe ser posterior a la fecha de fabricación');
+        alert('❌ La fecha de vencimiento debe ser posterior a la de fabricación');
         return;
     }
     
@@ -230,10 +344,7 @@ function registrarCompra() {
         if (!confirmar) return;
     }
     
-    // Buscar info del medicamento
     const medicamento = buscarMedicamento(datos.codigoMed);
-    
-    // Calcular valores contables
     const subtotal = datos.cantidad * datos.precio;
     const iva = subtotal * 0.13;
     const total = subtotal + iva;
@@ -241,7 +352,7 @@ function registrarCompra() {
     console.log('💾 Registrando compra...', datos);
     
     try {
-        // 1. AGREGAR A INVENTARIO_LOTES
+        // 1. Agregar a inventario
         const nuevoLote = {
             ID_Lote: generarIDLote(),
             Código_Med: datos.codigoMed,
@@ -251,13 +362,13 @@ function registrarCompra() {
             Cant_Actual: datos.cantidad,
             Fecha_Fab: formatearFecha(new Date(datos.fechaFab)),
             Fecha_Venc: formatearFecha(new Date(datos.fechaVenc)),
-            Costo_Unit: datos.precio,
-            Estado: '✅ Activo'
+            Costo_Unit: parseFloat(datos.precio).toFixed(2),
+            Estado: 'Activo'
         };
         hojas.inventario.push(nuevoLote);
         
-        // 2. AGREGAR A LIBRO_COMPRAS
-        const nuevaCompra = {
+        // 2. Agregar a libro de compras
+        hojas.compras.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Factura: datos.numFactura,
             Proveedor: datos.proveedor,
@@ -265,18 +376,16 @@ function registrarCompra() {
             Nombre_Med: medicamento.Nombre,
             Num_Lote: datos.numLote,
             Cantidad: datos.cantidad,
-            Precio_Unit: datos.precio,
-            Subtotal: subtotal,
-            IVA_13: iva,
-            Total: total
-        };
-        hojas.compras.push(nuevaCompra);
+            Precio_Unit: parseFloat(datos.precio).toFixed(2),
+            Subtotal: subtotal.toFixed(2),
+            IVA_13: iva.toFixed(2),
+            Total: total.toFixed(2)
+        });
         
-        // 3. GENERAR ASIENTOS CONTABLES EN LIBRO_DIARIO
+        // 3. Asientos contables
         const numAsiento = obtenerUltimoAsiento() + 1;
         const descripcion = `Compra ${medicamento.Nombre} - Fact. ${datos.numFactura}`;
         
-        // Asiento 1: Debe - Inventario
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
@@ -286,7 +395,6 @@ function registrarCompra() {
             Haber: 0
         });
         
-        // Asiento 2: Debe - IVA
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
@@ -296,7 +404,6 @@ function registrarCompra() {
             Haber: 0
         });
         
-        // Asiento 3: Haber - Cuentas por Pagar
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
@@ -307,26 +414,21 @@ function registrarCompra() {
         });
         
         console.log('✅ Compra registrada exitosamente');
-        console.log('  - Lote creado:', nuevoLote.ID_Lote);
-        console.log('  - Asiento contable:', numAsiento);
         
-        // Actualizar dashboard, recalcular y guardar excel 
-        recalcAll()
-        actualizarLibroMayor();
+        if (typeof recalcAll === 'function') recalcAll();
+        if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
+        if (typeof guardarExcel === 'function') guardarExcel();
+        
         mostrarDashboard();
         verificarAlertas();
         
-        
-        // Mostrar confirmación
         alert(`✅ Compra registrada exitosamente\n\n` +
               `Lote: ${nuevoLote.ID_Lote}\n` +
               `Medicamento: ${medicamento.Nombre}\n` +
-              `Cantidad: ${datos.cantidad} unidades\n` +
-              `Total: $${total.toFixed(2)}\n\n` +
-              `Se generaron 3 asientos contables en el Libro Diario.`);
-              
+              `Cantidad: ${formatearNumero(datos.cantidad)} unidades\n` +
+              `Total: ${formatearDinero(total)}\n\n` +
+              `Se generaron 3 asientos contables.`);
         
-        // Volver al dashboard
         document.getElementById('contenidoDinamico').innerHTML = '';
         
     } catch (error) {
@@ -339,8 +441,8 @@ function registrarCompra() {
 // CANCELAR COMPRA
 // ============================================
 function cancelarCompra() {
-    const confirmar = confirm('¿Desea cancelar el registro de la compra?');
-    if (confirmar) {
+    if (confirm('¿Desea cancelar el registro de la compra?')) {
         document.getElementById('contenidoDinamico').innerHTML = '';
+        mostrarDashboard();
     }
 }
