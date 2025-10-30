@@ -359,7 +359,7 @@ function verInventario() {
             </tbody>
         </table>
         <div style="background:#e3f2fd; padding:15px; margin-top:20px; border-radius:8px;">
-            <strong>💡 Nota:</strong> El stock real se calcula automáticamente. No necesitas editar el Excel manualmente.
+            <strong>💡 Nota:</strong> El stock real se calcula automáticamente.
         </div>
     `;
 
