@@ -80,7 +80,33 @@ function verReportes() {
 }
 
 // ============================================
-// REPORTE: MEDICAMENTOS CRÍTICOS (CLASE A)
+// FUNCIÓN AUXILIAR: CALCULAR STOCK REAL DE UN LOTE
+// ============================================
+// Agregar al inicio de reportes.js (después de verReportes())
+function calcularStockRealLote(numLote, codigoMed) {
+    // 1. Buscar la compra original
+    const compra = hojas.compras.find(c => 
+        c.Num_Lote === numLote && c.Código_Med === codigoMed
+    );
+    
+    if (!compra) {
+        console.warn(`⚠️ No se encontró compra para lote ${numLote}`);
+        return 0;
+    }
+    
+    const cantidadComprada = compra.Cantidad || 0;
+    
+    // 2. Calcular total de salidas de ese lote
+    const totalSalidas = hojas.salidas
+        .filter(s => s.Num_Lote === numLote && s.Código_Med === codigoMed)
+        .reduce((sum, s) => sum + (s.Cantidad_Despachada || 0), 0);
+    
+    // 3. Stock real = Comprado - Despachado
+    return Math.max(0, cantidadComprada - totalSalidas);
+}
+
+// ============================================
+// REPORTE: MEDICAMENTOS CRÍTICOS (CLASE A) - CORREGIDO
 // ============================================
 function reporteMedicamentosCriticos() {
     console.log('📊 Generando reporte de medicamentos críticos...');
@@ -90,13 +116,19 @@ function reporteMedicamentosCriticos() {
     
     // Calcular stock y valor de cada uno
     const reporte = medicamentosA.map(med => {
-        const stockTotal = hojas.inventario
-            .filter(l => l.Código_Med === med.Código)
-            .reduce((sum, l) => sum + (l.Cant_Actual || 0), 0);
+        // ✅ CALCULAR STOCK REAL (compras - salidas)
+        let stockTotal = 0;
+        let valorTotal = 0;
         
-        const valorTotal = hojas.inventario
+        hojas.inventario
             .filter(l => l.Código_Med === med.Código)
-            .reduce((sum, l) => sum + ((l.Cant_Actual || 0) * (l.Costo_Unit || 0)), 0);
+            .forEach(lote => {
+                const stockLote = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+                const valorLote = stockLote * (lote.Costo_Unit || 0);
+                
+                stockTotal += stockLote;
+                valorTotal += valorLote;
+            });
         
         return {
             codigo: med.Código,
@@ -118,6 +150,7 @@ function reporteMedicamentosCriticos() {
             <h2>🔴 Reporte: Medicamentos Críticos (Clase A)</h2>
             <p>Medicamentos de alto valor que requieren mayor control</p>
             <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-SV')}</p>
+            <p style="color:#667eea; font-weight:bold;">✨ Calculado automáticamente: Compras - Salidas</p>
             
             <table>
                 <thead>
@@ -142,9 +175,9 @@ function reporteMedicamentosCriticos() {
             <tr style="${item.alertaBajoStock ? 'background:#ffe6e6;' : ''}">
                 <td>${item.codigo}</td>
                 <td><strong>${item.nombre}</strong></td>
-               <td>${formatearNumero(item.stock)}</td>
+                <td>${formatearNumero(item.stock)}</td>
                 <td>${formatearNumero(item.stockMin)}</td>
-                 <td>${formatearDinero(item.valorTotal)}</td>
+                <td>${formatearDinero(item.valorTotal)}</td>
                 <td>${estado}</td>
             </tr>
         `;
@@ -155,7 +188,7 @@ function reporteMedicamentosCriticos() {
                 <tfoot>
                     <tr style="background:#f0f0f0; font-weight:bold;">
                         <td colspan="4">TOTAL CLASE A</td>
-                           <td>${formatearDinero(valorTotalA)}</td>
+                        <td>${formatearDinero(valorTotalA)}</td>
                         <td></td>
                     </tr>
                 </tfoot>
@@ -182,10 +215,11 @@ function reporteMedicamentosCriticos() {
     
     document.getElementById('contenidoDinamico').innerHTML = html;
 }
-
 // ============================================
 // REPORTE: PRÓXIMOS A VENCER
 // ============================================
+
+
 function reporteProximosVencer() {
     console.log('📊 Generando reporte de próximos a vencer...');
     
@@ -195,15 +229,20 @@ function reporteProximosVencer() {
     const monitoreo = []; // 60-90 días
     
     hojas.inventario.forEach(lote => {
-        if (lote.Cant_Actual === 0) return;
+        // ✅ Calcular stock real
+        const stockReal = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+        
+        // Solo considerar lotes con stock disponible
+        if (stockReal === 0) return;
         
         const fechaVenc = new Date(lote.Fecha_Venc.split('/').reverse().join('-'));
         const diasRestantes = Math.floor((fechaVenc - hoy) / (1000 * 60 * 60 * 24));
         
         const item = {
             ...lote,
+            stockReal: stockReal,
             diasRestantes: diasRestantes,
-            valorRiesgo: lote.Cant_Actual * lote.Costo_Unit
+            valorRiesgo: stockReal * (lote.Costo_Unit || 0)
         };
         
         if (diasRestantes <= 30 && diasRestantes > 0) {
@@ -221,13 +260,14 @@ function reporteProximosVencer() {
         <div class="reporte-detalle">
             <h2>⚠️ Reporte: Medicamentos Próximos a Vencer</h2>
             <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-SV')}</p>
+            <p style="color:#667eea; font-weight:bold;">✨ Solo muestra lotes con stock disponible</p>
             
             <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:20px; margin:20px 0;">
                 <div style="background:#ffebee; padding:20px; border-radius:8px; text-align:center;">
                     <h3>🔴 URGENTE</h3>
                     <p style="font-size:2em; font-weight:bold; margin:10px 0;">${urgente.length}</p>
                     <p>≤ 30 días</p>
-                  <p>Valor: ${formatearDinero(valorUrgente)}</p>
+                    <p>Valor: ${formatearDinero(valorUrgente)}</p>
                 </div>
                 <div style="background:#fff3cd; padding:20px; border-radius:8px; text-align:center;">
                     <h3>🟡 ATENCIÓN</h3>
@@ -248,7 +288,7 @@ function reporteProximosVencer() {
                     <tr>
                         <th>Medicamento</th>
                         <th>Lote</th>
-                        <th>Cantidad</th>
+                        <th>Stock Real</th>
                         <th>Vencimiento</th>
                         <th>Días Restantes</th>
                         <th>Valor en Riesgo</th>
@@ -260,10 +300,10 @@ function reporteProximosVencer() {
                         <tr style="background:#ffebee;">
                             <td><strong>${lote.Nombre_Med}</strong></td>
                             <td>${lote.Num_Lote}</td>
-                             <td>${formatearNumero(lote.Cant_Actual)}</td>
+                            <td>${formatearNumero(lote.stockReal)}</td>
                             <td>${lote.Fecha_Venc}</td>
                             <td><strong style="color:red;">${lote.diasRestantes} días</strong></td>
-                              <td>${formatearDinero(lote.valorRiesgo)}</td>
+                            <td>${formatearDinero(lote.valorRiesgo)}</td>
                             <td>${lote.diasRestantes <= 10 ? 'DESPACHAR YA' : 'Usar prioritariamente'}</td>
                         </tr>
                     `).join('')}
@@ -281,40 +321,66 @@ function reporteProximosVencer() {
     document.getElementById('contenidoDinamico').innerHTML = html;
 }
 
+
 // ============================================
-// REPORTE: VALORACIÓN ABC
+// FUNCIÓN MEJORADA: REPORTE VALORACIÓN ABC
 // ============================================
+// Reemplazar en reportes.js
 function reporteValoracionABC() {
     console.log('📊 Generando reporte de valoración ABC...');
     
     let valorA = 0, valorB = 0, valorC = 0;
     let cantA = 0, cantB = 0, cantC = 0;
     
+    // Array para detalles por medicamento
+    const detallesMedicamentos = [];
+    
     hojas.catalogo.forEach(med => {
-        const valor = hojas.inventario
-            .filter(l => l.Código_Med === med.Código)
-            .reduce((sum, l) => sum + ((l.Cant_Actual || 0) * (l.Costo_Unit || 0)), 0);
+        // Calcular stock real y valor de todos los lotes de este medicamento
+        let stockRealMed = 0;
+        let valorMed = 0;
         
+        hojas.inventario
+            .filter(l => l.Código_Med === med.Código)
+            .forEach(lote => {
+                const stockLote = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+                const costoLote = lote.Costo_Unit || 0;
+                
+                stockRealMed += stockLote;
+                valorMed += (stockLote * costoLote);
+            });
+        
+        // Guardar detalles
+        detallesMedicamentos.push({
+            codigo: med.Código,
+            nombre: med.Nombre,
+            clase: med.Clase_ABC,
+            stock: stockRealMed,
+            valor: valorMed
+        });
+        
+        // Sumar por clasificación
         if (med.Clase_ABC === 'A') {
-            valorA += valor;
+            valorA += valorMed;
             cantA++;
         } else if (med.Clase_ABC === 'B') {
-            valorB += valor;
+            valorB += valorMed;
             cantB++;
         } else {
-            valorC += valor;
+            valorC += valorMed;
             cantC++;
         }
     });
     
     const valorTotal = valorA + valorB + valorC;
-    const porcA = ((valorA / valorTotal) * 100).toFixed(1);
-    const porcB = ((valorB / valorTotal) * 100).toFixed(1);
-    const porcC = ((valorC / valorTotal) * 100).toFixed(1);
+    const porcA = valorTotal > 0 ? ((valorA / valorTotal) * 100).toFixed(1) : 0;
+    const porcB = valorTotal > 0 ? ((valorB / valorTotal) * 100).toFixed(1) : 0;
+    const porcC = valorTotal > 0 ? ((valorC / valorTotal) * 100).toFixed(1) : 0;
     
     const html = `
         <div class="reporte-detalle">
             <h2>📈 Reporte: Valoración ABC del Inventario</h2>
+            <p style="color:#667eea; font-weight:bold;">✨ Calculado automáticamente: Compras - Salidas</p>
             <p><strong>Fecha:</strong> ${new Date().toLocaleDateString('es-SV')}</p>
             
             <table>
@@ -364,10 +430,9 @@ function reporteValoracionABC() {
             <div style="background:#e3f2fd; padding:20px; border-radius:8px; margin-top:20px;">
                 <h4>📊 Interpretación del Análisis ABC:</h4>
                 <ul>
-                     <li><strong>Clase A:</strong> ${formatearNumero(cantA)} medicamentos (${((cantA/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcA}% del valor total</li>
-                    <li><strong>Clase B:</strong> ${formatearNumero(cantB)} medicamentos (${((cantB/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcB}% del valor total</li>
-                    <li><strong>Clase C:</strong> ${formatearNumero(cantC)} medicamentos (${((cantC/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcC}% del valor total</li>
-                </ul>
+                    <li><strong>Clase A:</strong> ${cantA} medicamentos (${((cantA/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcA}% del valor total</li>
+                    <li><strong>Clase B:</strong> ${cantB} medicamentos (${((cantB/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcB}% del valor total</li>
+                    <li><strong>Clase C:</strong> ${cantC} medicamentos (${((cantC/hojas.catalogo.length)*100).toFixed(0)}%) representan ${porcC}% del valor total</li>
                 </ul>
                 <p style="margin-top:15px;"><strong>💡 Recomendación:</strong> Enfocar el 80% de los esfuerzos de control en los medicamentos Clase A.</p>
             </div>
@@ -388,7 +453,7 @@ function reporteValoracionABC() {
 function reporteMovimientos() {
     const html = `
         <div class="reporte-detalle">
-            <h2>📋 Reporte: Movimientos del Mes</h2>
+            <h2>📋 Reporte: Movimientos de Compras y Salidas</h2>
             
             <h3>📥 Compras Registradas (${formatearNumero(hojas.compras.length)})</h3>
             ${hojas.compras.length === 0 ? '<p>No hay compras registradas</p>' : `
@@ -427,6 +492,7 @@ ${hojas.salidas.length === 0 ? '<p>No hay salidas registradas</p>' : `
             <th>N° Despacho</th>
             <th>Hospital</th>
             <th>Medicamento</th>
+            <th>Num_Lote</th> 
             <th>Cantidad</th>
             <th>Costo Unit.</th>
             <th>Total</th>
@@ -439,6 +505,7 @@ ${hojas.salidas.length === 0 ? '<p>No hay salidas registradas</p>' : `
                 <td>${s.Num_Despacho}</td>
                 <td>${s.Hospital_Destino}</td>
                 <td>${s.Nombre_Med}</td>
+                <td>${s.Num_Lote}</td>
                  <td>${formatearNumero(s.Cantidad_Despachada)}</td>
                 <td>${formatearDinero(s.Costo_Unit || s.Costo_Unit_1 || 0)}</td>
                 <td>${formatearDinero(s.Total || s.Total_1 || 0)}</td>

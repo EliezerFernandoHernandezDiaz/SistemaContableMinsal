@@ -1,3 +1,117 @@
+// ============================================
+// REGENERAR SALIDAS DESDE DIFERENCIAS EN INVENTARIO
+// ============================================
+function regenerarSalidasFaltantes() {
+    const confirmar = confirm(
+        `🔄 REGENERAR SALIDAS FALTANTES\n\n` +
+        `Esta función analizará el inventario y generará registros de salidas\n` +
+        `para todas las diferencias entre cantidad inicial y actual.\n\n` +
+        `⚠️ ADVERTENCIA:\n` +
+        `• Se generarán salidas genéricas "Ajuste de Inventario"\n` +
+        `• Se crearán asientos contables para balancear las cuentas\n` +
+        `• Esta acción es irreversible\n\n` +
+        `¿Desea continuar?`
+    );
+    
+    if (!confirmar) return;
+    
+    try {
+        let salidasGeneradas = 0;
+        let valorTotalSalidas = 0;
+        let numDespacho = 126; // Empezar desde D-00126
+        
+        // Buscar el último número de asiento
+        let numAsiento = obtenerUltimoAsiento() + 1;
+        
+        // Analizar cada lote del inventario
+        hojas.inventario.forEach((lote) => {
+            const cantInicial = parseFloat(lote.Cant_Inicial || 0);
+            const cantActual = parseFloat(lote.Cant_Actual || 0);
+            const diferencia = cantInicial - cantActual;
+            
+            // Si hay diferencia, significa que hubo una salida no registrada
+            if (diferencia > 0) {
+                const costoUnit = parseFloat(lote.Costo_Unit || 0);
+                const costoTotal = diferencia * costoUnit;
+                
+                // Generar fecha
+                const fechaSalida = '30/10/2025';
+                
+                numDespacho++;
+                const numDespachoStr = `D-${String(numDespacho).padStart(5, '0')}`;
+                
+                // 1. Agregar a la hoja de Salidas
+                hojas.salidas.push({
+                    Fecha: fechaSalida,
+                    Num_Despacho: numDespachoStr,
+                    Hospital_Destino: 'Ajuste de Inventario',
+                    Código_Med: lote.Código_Med,
+                    Nombre_Med: lote.Nombre_Med,
+                    Num_Lote: lote.Num_Lote,
+                    Cantidad_Despachada: diferencia,
+                    Costo_Unit: costoUnit,
+                    Total: costoTotal
+                });
+                
+                // 2. Generar asientos contables
+                const descripcion = `Ajuste Inventario ${lote.Nombre_Med} - ${numDespachoStr}`;
+                
+                // Asiento 1: Costo de Medicamentos Despachados (DEBE)
+                hojas.diario.push({
+                    Fecha: fechaSalida,
+                    Num_Asiento: numAsiento,
+                    Descripción: descripcion,
+                    Cuenta: 'Costo de Medicamentos Despachados',
+                    Código_Med: lote.Código_Med,
+                    Debe: parseFloat(costoTotal.toFixed(2)),
+                    Haber: 0
+                });
+                
+                // Asiento 2: Inventario de Medicamentos (HABER)
+                hojas.diario.push({
+                    Fecha: fechaSalida,
+                    Num_Asiento: numAsiento,
+                    Descripción: descripcion,
+                    Cuenta: 'Inventario de Medicamentos',
+                    Código_Med: lote.Código_Med,
+                    Debe: 0,
+                    Haber: parseFloat(costoTotal.toFixed(2))
+                });
+                
+                console.log(`✅ Salida generada: ${lote.Nombre_Med} - ${diferencia} unidades - $${costoTotal.toFixed(2)}`);
+                
+                salidasGeneradas++;
+                valorTotalSalidas += costoTotal;
+                numAsiento++;
+            }
+        });
+        
+        // 3. Actualizar todo
+        if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
+        if (typeof guardarExcel === 'function') guardarExcel();
+        
+        mostrarDashboard();
+        
+        alert(
+            `✅ SALIDAS REGENERADAS EXITOSAMENTE\n\n` +
+            `📊 Resumen:\n` +
+            `• Salidas generadas: ${salidasGeneradas}\n` +
+            `• Valor total salidas: ${formatearDinero(valorTotalSalidas)}\n` +
+            `• Asientos contables: ${salidasGeneradas * 2}\n\n` +
+            `✅ El inventario ahora está balanceado con las salidas registradas.\n` +
+            `✅ El Libro Mayor se ha actualizado correctamente.`
+        );
+        
+        console.log(`\n📊 RESUMEN FINAL:`);
+        console.log(`Salidas generadas: ${salidasGeneradas}`);
+        console.log(`Valor total: ${formatearDinero(valorTotalSalidas)}`);
+        
+    } catch (error) {
+        console.error('❌ Error al regenerar salidas:', error);
+        alert('❌ Error al regenerar salidas:\n' + error.message);
+    }
+}
+
 //Funcion para generar el numero de despacho automaticamente
 function generarNumeroDespacho(){
     let ultimoNum=0; 

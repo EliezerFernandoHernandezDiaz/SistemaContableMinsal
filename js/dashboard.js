@@ -1,3 +1,32 @@
+// ============================================
+// FUNCIÓN CENTRAL: CALCULAR STOCK REAL DE UN LOTE
+// ============================================
+// Esta función calcula el stock disponible restando las salidas de las compras
+function calcularStockRealLote(numLote, codigoMed) {
+    // 1. Buscar la compra original (cantidad inicial)
+    const compra = hojas.compras.find(c => 
+        c.Num_Lote === numLote && c.Código_Med === codigoMed
+    );
+    
+    if (!compra) {
+        console.warn(`⚠️ No se encontró compra para lote ${numLote}`);
+        return 0;
+    }
+    
+    const cantidadComprada = compra.Cantidad || 0;
+    
+    // 2. Calcular total de salidas de ese lote específico
+    const totalSalidas = hojas.salidas
+        .filter(s => s.Num_Lote === numLote && s.Código_Med === codigoMed)
+        .reduce((sum, s) => sum + (s.Cantidad_Despachada || 0), 0);
+    
+    // 3. Stock real = Comprado - Despachado
+    const stockReal = cantidadComprada - totalSalidas;
+    
+    return Math.max(0, stockReal); // No puede ser negativo
+}
+
+
 ///Función auxiliar para manejar los valores con separación de miles y decimales
 function formatearNumero(numero) {
     if (numero === null || numero === undefined || numero === '' || isNaN(numero)) {
@@ -59,20 +88,36 @@ function mostrarDashboard() {
     console.log('  - Valor total: $' + valorTotal.toFixed(2));
 }
 
+
 // ============================================
-// CALCULAR VALOR DEL INVENTARIO
+// FUNCIÓN MEJORADA: CALCULAR VALOR DEL INVENTARIO
 // ============================================
+
 function calcularValorInventario() {
-    return hojas.inventario.reduce((total, lote) => {
-        const cantidad = lote.Cant_Actual || 0;
+    let valorTotal = 0;
+    
+    // Recorrer cada lote del inventario
+    hojas.inventario.forEach(lote => {
+        // Calcular stock real (compras - salidas)
+        const stockReal = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+        
+        // Calcular valor de ese lote
         const costo = lote.Costo_Unit || 0;
-        return total + (cantidad * costo);
-    }, 0);
+        const valorLote = stockReal * costo;
+        
+        valorTotal += valorLote;
+        
+        // Debug opcional
+        // console.log(`${lote.Nombre_Med} (${lote.Num_Lote}): Stock=${stockReal}, Valor=${valorLote.toFixed(2)}`);
+    });
+    
+    return valorTotal;
 }
 
 // ============================================
-// VERIFICAR ALERTAS
+// FUNCIÓN MEJORADA: ALERTAS
 // ============================================
+
 function verificarAlertas() {
     console.log('🔍 Verificando alertas...');
     
@@ -80,12 +125,14 @@ function verificarAlertas() {
     
     // 1. ALERTAS DE STOCK BAJO
     hojas.catalogo.forEach(med => {
-        // Calcular stock total del medicamento
-        const stockTotal = hojas.inventario
+        // Calcular stock total real del medicamento
+        let stockTotal = 0;
+        hojas.inventario
             .filter(lote => lote.Código_Med === med.Código)
-            .reduce((sum, lote) => sum + (lote.Cant_Actual || 0), 0);
+            .forEach(lote => {
+                stockTotal += calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+            });
         
-        // Comparar con stock mínimo
         if (stockTotal < med.Stock_Min) {
             alertas.push({
                 tipo: 'critico',
@@ -94,34 +141,35 @@ function verificarAlertas() {
         }
     });
     
-    // 2. ALERTAS DE PRÓXIMOS A VENCER
+    // 2. ALERTAS DE PRÓXIMOS A VENCER (solo lotes con stock real)
     const hoy = new Date();
     hojas.inventario.forEach(lote => {
-        if (!lote.Fecha_Venc || lote.Cant_Actual === 0) return;
+        if (!lote.Fecha_Venc) return;
         
-        const fechaVenc = new Date(lote.Fecha_Venc);
+        const stockReal = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+        if (stockReal === 0) return; // Ignorar lotes agotados
+        
+        const fechaVenc = parsearFecha(lote.Fecha_Venc);
+        if (!fechaVenc) return;
+        
         const diasRestantes = Math.floor((fechaVenc - hoy) / (1000 * 60 * 60 * 24));
         
-        // Alertar si vence en 30 días o menos
         if (diasRestantes <= 30 && diasRestantes > 0) {
             alertas.push({
                 tipo: 'advertencia',
-                mensaje: `🟡 ${lote.Nombre_Med} - Lote ${lote.Num_Lote} vence en ${diasRestantes} días (${formatearFecha(lote.Fecha_Venc)})`
+                mensaje: `🟡 ${lote.Nombre_Med} - Lote ${lote.Num_Lote} vence en ${diasRestantes} días (Stock: ${stockReal})`
             });
         }
         
-        // Alertar si ya venció
         if (diasRestantes <= 0) {
             alertas.push({
                 tipo: 'critico',
-                mensaje: `🔴 ${lote.Nombre_Med} - Lote ${lote.Num_Lote} YA VENCIÓ (${formatearFecha(lote.Fecha_Venc)})`
+                mensaje: `🔴 ${lote.Nombre_Med} - Lote ${lote.Num_Lote} YA VENCIÓ (Stock: ${stockReal})`
             });
         }
     });
     
     console.log('  - Alertas encontradas:', alertas.length);
-    
-    // Mostrar alertas en HTML
     mostrarAlertasHTML(alertas);
 }
 
@@ -150,90 +198,86 @@ function mostrarAlertasHTML(alertas) {
     document.getElementById('listaAlertas').innerHTML = html;
 }
 
-/// ============================================
-// VER CATÁLOGO COMPLETO (versión robusta)
+
 // ============================================
+// FUNCIÓN MEJORADA: VER CATÁLOGO
+// ============================================
+// Reemplazar en dashboard.js
 function verCatalogo() {
-  console.log("📋 Mostrando catálogo...");
+    console.log("📋 Mostrando catálogo...");
 
-  let html = `
-    <h2>📋 Catálogo de Medicamentos</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Nombre</th>
-          <th>Presentación</th>
-          <th>Concentración</th>
-          <th>Precio Unit.</th>
-          <th>Clase ABC</th>
-          <th>Stock Min</th>
-          <th>Stock Max</th>
-          <th>Stock Actual</th>
-        </tr>
-      </thead>
-      <tbody>
-  `;
+    let html = `
+        <h2>📋 Catálogo de Medicamentos</h2>
+        <p style="color:#667eea; font-weight:bold;">✨ Stocks calculados automáticamente por lote</p>
+        <table>
+            <thead>
+                <tr>
+                    <th>Código</th>
+                    <th>Nombre</th>
+                    <th>Presentación</th>
+                    <th>Concentración</th>
+                    <th>Precio Unit.</th>
+                    <th>Clase ABC</th>
+                    <th>Stock Min</th>
+                    <th>Stock Max</th>
+                    <th>Stock Real</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
 
-  hojas.catalogo.forEach((med) => {
-    // --- Resolver alias de campos con o sin tilde ---
-    const presentacion =
-      med.Presentacion ??
-      med["Presentación"] ??
-      med["Presentaci\u00F3n"] ??
-      med["PresentaciÃ³n"] ??
-      "—";
+    hojas.catalogo.forEach((med) => {
+        const presentacion = med.Presentacion ?? med["Presentación"] ?? "—";
+        const concentracion = med.Concentracion ?? med["Concentración"] ?? "—";
 
-    const concentracion =
-      med.Concentracion ??
-      med["Concentración"] ??
-      med["Concentraci\u00F3n"] ??
-      med["ConcentraciÃ³n"] ??
-      "—";
+        // Calcular stock real sumando todos los lotes de este medicamento
+        let stockReal = 0;
+        hojas.inventario
+            .filter(lote => lote.Código_Med === med.Código)
+            .forEach(lote => {
+                stockReal += calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
+            });
 
-    // --- Calcular stock actual ---
-    const stockActual = hojas.inventario
-      .filter((lote) => lote.Código_Med === med.Código)
-      .reduce((sum, lote) => sum + (lote.Cant_Actual || 0), 0);
+        const claseABC = med.Clase_ABC ? med.Clase_ABC.toUpperCase() : "—";
+        const badgeClase = `<span class="badge badge-${claseABC.toLowerCase()}">${claseABC}</span>`;
 
-    // --- Badge de clase ABC ---
-    const claseABC = med.Clase_ABC ? med.Clase_ABC.toUpperCase() : "—";
-    const badgeClase = `<span class="badge badge-${claseABC.toLowerCase()}">${claseABC}</span>`;
+        const esStockBajo = stockReal < (med.Stock_Min || 0);
+        const colorStock = esStockBajo ? 'style="color:red; font-weight:bold;"' : 'style="color:#28a745; font-weight:bold;"';
 
-    // --- Color si stock bajo ---
-    const esStockBajo = stockActual < (med.Stock_Min || 0);
-    const colorStock = esStockBajo
-      ? 'style="color:red; font-weight:bold;"'
-      : "";
+        html += `
+            <tr>
+                <td>${med.Código}</td>
+                <td><strong>${med.Nombre || "—"}</strong></td>
+                <td>${presentacion}</td>
+                <td>${concentracion}</td>
+                <td>$${(med.Precio_Unit || 0).toFixed(2)}</td>
+                <td>${badgeClase}</td>
+                <td>${formatearNumero(med.Stock_Min || 0)}</td>
+                <td>${formatearNumero(med.Stock_Max || 0)}</td>
+                <td ${colorStock}>${formatearNumero(stockReal)}</td>
+            </tr>
+        `;
+    });
 
     html += `
-      <tr>
-        <td>${med.Código}</td>
-        <td><strong>${med.Nombre || "—"}</strong></td>
-        <td>${presentacion}</td>
-        <td>${concentracion}</td>
-        <td>$${(med.Precio_Unit || 0).toFixed(2)}</td>
-        <td>${badgeClase}</td>
-        <td>${formatearNumero(med.Stock_Min || 0)}</td>
-        <td>${formatearNumero(med.Stock_Max || 0)}</td>
-      <td ${colorStock}>${formatearNumero(stockActual)}</td>
-      </tr>
+            </tbody>
+        </table>
     `;
-  });
 
-  html += `
-      </tbody>
-    </table>
-  `;
-
-  document.getElementById("contenidoDinamico").innerHTML = html;
+    document.getElementById("contenidoDinamico").innerHTML = html;
 }
 
+
+// ============================================
+// FUNCIÓN MEJORADA: VER INVENTARIO
+// ============================================
+// Reemplazar en dashboard.js
 function verInventario() {
     console.log("📦 Mostrando inventario por lotes...");
 
     let html = `
-        <h2>📦 Inventario por Lotes</h2>
+        <h2>📦 Inventario por Lotes (Actualizado Automáticamente)</h2>
+        <p style="color:#667eea; font-weight:bold;">✨ Los stocks se calculan automáticamente: Compras - Salidas</p>
         <table>
             <thead>
                 <tr>
@@ -241,11 +285,12 @@ function verInventario() {
                     <th>Código</th>
                     <th>Medicamento</th>
                     <th>N° Lote</th>
-                    <th>Cant. Inicial</th>
-                    <th>Cant. Actual</th>
-                    <th>Fecha Fab.</th>
+                    <th>Cant. Comprada</th>
+                    <th>Cant. Despachada</th>
+                    <th>Stock Real</th>
                     <th>Fecha Venc.</th>
                     <th>Costo Unit.</th>
+                    <th>Valor Total</th>
                     <th>Estado</th>
                 </tr>
             </thead>
@@ -253,19 +298,27 @@ function verInventario() {
     `;
 
     hojas.inventario.forEach((lote) => {
-        // --- Formatear fechas para mostrar ---
-        const fechaFabDisplay = formatearFechaDisplay(lote.Fecha_Fab);
-        const fechaVencDisplay = formatearFechaDisplay(lote.Fecha_Venc);
+        // Calcular stock real
+        const stockReal = calcularStockRealLote(lote.Num_Lote, lote.Código_Med);
         
-        // --- Convertir fecha de vencimiento a Date para cálculos ---
+        // Calcular salidas de este lote
+        const totalSalidas = hojas.salidas
+            .filter(s => s.Num_Lote === lote.Num_Lote && s.Código_Med === lote.Código_Med)
+            .reduce((sum, s) => sum + (s.Cantidad_Despachada || 0), 0);
+        
+        // Valor total del lote
+        const valorLote = stockReal * (lote.Costo_Unit || 0);
+        
+        // Formatear fechas
+        const fechaVencDisplay = formatearFechaDisplay(lote.Fecha_Venc);
         const fechaVencimientoReal = parsearFecha(lote.Fecha_Venc);
         const hoy = new Date();
         
-        // --- Determinar estado del lote ---
+        // Determinar estado
         let estado = "";
         let badgeClass = "";
 
-        if (lote.Cant_Actual === 0) {
+        if (stockReal === 0) {
             estado = "Agotado";
             badgeClass = "badge-agotado";
         } else if (fechaVencimientoReal && fechaVencimientoReal < hoy) {
@@ -285,7 +338,6 @@ function verInventario() {
             badgeClass = "badge-activo";
         }
 
-        // --- Renderizar la fila ---
         html += `
             <tr>
                 <td>${lote.ID_Lote || "—"}</td>
@@ -293,10 +345,11 @@ function verInventario() {
                 <td><strong>${lote.Nombre_Med || "—"}</strong></td>
                 <td>${lote.Num_Lote || "—"}</td>
                 <td>${formatearNumero(lote.Cant_Inicial || 0)}</td>
-                <td><strong>${formatearNumero(lote.Cant_Actual || 0)}</strong></td>
-                <td>${fechaFabDisplay}</td>
+                <td style="color:#dc3545; font-weight:bold;">${formatearNumero(totalSalidas)}</td>
+                <td style="color:#28a745; font-weight:bold; font-size:1.1em;">${formatearNumero(stockReal)}</td>
                 <td>${fechaVencDisplay}</td>
                 <td>${formatearDinero(lote.Costo_Unit || 0)}</td>
+                <td style="font-weight:bold;">${formatearDinero(valorLote)}</td>
                 <td><span class="badge ${badgeClass}">${estado}</span></td>
             </tr>
         `;
@@ -305,10 +358,12 @@ function verInventario() {
     html += `
             </tbody>
         </table>
+        <div style="background:#e3f2fd; padding:15px; margin-top:20px; border-radius:8px;">
+            <strong>💡 Nota:</strong> El stock real se calcula automáticamente. No necesitas editar el Excel manualmente.
+        </div>
     `;
 
     document.getElementById("contenidoDinamico").innerHTML = html;
-    console.log("✅ Inventario mostrado correctamente");
 }
 // ============================================
 // FUNCIÓN AUXILIAR: FORMATEAR Y NORMALIZAR FECHAS
