@@ -1,3 +1,138 @@
+// ============================================
+// REGENERAR ASIENTOS DESDE COMPRAS EXISTENTES
+// ============================================
+function regenerarAsientosContables() {
+    if (!hojas.compras || hojas.compras.length === 0) {
+        alert('⚠️ No hay compras registradas para procesar');
+        return;
+    }
+    
+    const confirmar = confirm(
+        `🔄 REGENERAR ASIENTOS CONTABLES\n\n` +
+        `Se encontraron ${hojas.compras.length} compras registradas.\n\n` +
+        `Esta acción:\n` +
+        `• Borrará todos los asientos del Libro Diario actual\n` +
+        `• Generará nuevos asientos para cada compra\n` +
+        `• Recalculará el Libro Mayor\n\n` +
+        `¿Desea continuar?`
+    );
+    
+    if (!confirmar) return;
+    
+    try {
+        // 1. Limpiar libro diario actual
+        hojas.diario = [];
+        
+        let asientosGenerados = 0;
+        let numAsiento = 1;
+        
+        // 2. Por cada compra, generar 3 asientos
+        hojas.compras.forEach((compra) => {
+            const subtotal = parseFloat(compra.Subtotal) || 0;
+            const iva = parseFloat(compra.IVA_13) || 0;
+            const total = parseFloat(compra.Total) || 0;
+            
+            // Validar que los datos sean correctos
+            if (subtotal === 0 || total === 0) {
+                console.warn(`⚠️ Compra con valores en cero:`, compra);
+                return; // Skip esta compra
+            }
+            
+            const descripcion = `Compra ${compra.Nombre_Med} - Fact. ${compra.Num_Factura}`;
+            
+            // Asiento 1: Inventario (DEBE)
+            hojas.diario.push({
+                Fecha: compra.Fecha,
+                Num_Asiento: numAsiento,
+                Descripción: descripcion,
+                Cuenta: 'Inventario de Medicamentos',
+                Debe: parseFloat(subtotal.toFixed(2)),
+                Haber: 0
+            });
+            
+            // Asiento 2: IVA (DEBE)
+            hojas.diario.push({
+                Fecha: compra.Fecha,
+                Num_Asiento: numAsiento,
+                Descripción: descripcion,
+                Cuenta: 'IVA Crédito Fiscal',
+                Debe: parseFloat(iva.toFixed(2)),
+                Haber: 0
+            });
+            
+            // Asiento 3: Cuentas por Pagar (HABER)
+            hojas.diario.push({
+                Fecha: compra.Fecha,
+                Num_Asiento: numAsiento,
+                Descripción: descripcion,
+                Cuenta: 'Cuentas por Pagar',
+                Debe: 0,
+                Haber: parseFloat(total.toFixed(2))
+            });
+            
+            asientosGenerados += 3;
+            numAsiento++;
+        });
+        
+        console.log(`✅ Asientos regenerados: ${asientosGenerados}`);
+        
+        // 3. Procesar salidas/despachos si existen
+        if (hojas.salidas && hojas.salidas.length > 0) {
+            hojas.salidas.forEach((salida) => {
+                const costoTotal = parseFloat(salida.Costo_Total) || 0;
+                
+                if (costoTotal === 0) {
+                    console.warn(`⚠️ Salida con costo en cero:`, salida);
+                    return;
+                }
+                
+                const descripcion = `Despacho ${salida.Hospital} - ${salida.Num_Despacho}`;
+                
+                // Asiento 1: Costo de Medicamentos (DEBE)
+                hojas.diario.push({
+                    Fecha: salida.Fecha,
+                    Num_Asiento: numAsiento,
+                    Descripción: descripcion,
+                    Cuenta: 'Costo de Medicamentos Despachados',
+                    Debe: parseFloat(costoTotal.toFixed(2)),
+                    Haber: 0
+                });
+                
+                // Asiento 2: Inventario (HABER)
+                hojas.diario.push({
+                    Fecha: salida.Fecha,
+                    Num_Asiento: numAsiento,
+                    Descripción: descripcion,
+                    Cuenta: 'Inventario de Medicamentos',
+                    Debe: 0,
+                    Haber: parseFloat(costoTotal.toFixed(2))
+                });
+                
+                asientosGenerados += 2;
+                numAsiento++;
+            });
+        }
+        
+        // 4. Actualizar todo
+        if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
+        if (typeof guardarExcel === 'function') guardarExcel();
+        
+        mostrarDashboard();
+        
+        alert(
+            `✅ ASIENTOS REGENERADOS EXITOSAMENTE\n\n` +
+            `📊 Resumen:\n` +
+            `• Compras procesadas: ${hojas.compras.length}\n` +
+            `• Salidas procesadas: ${hojas.salidas ? hojas.salidas.length : 0}\n` +
+            `• Total asientos generados: ${asientosGenerados}\n\n` +
+            `✅ El Libro Diario y Mayor han sido actualizados.`
+        );
+        
+    } catch (error) {
+        console.error('❌ Error al regenerar asientos:', error);
+        alert('❌ Error al regenerar asientos:\n' + error.message);
+    }
+}
 
 // ============================================
 // MAPEO: MEDICAMENTO → PROVEEDOR
@@ -387,35 +522,41 @@ function registrarCompra() {
         const numAsiento = obtenerUltimoAsiento() + 1;
         const descripcion = `Compra ${medicamento.Nombre} - Fact. ${datos.numFactura}`;
         
+
+        //Primero: Inventario (DEBE)
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
             Descripción: descripcion,
             Cuenta: 'Inventario de Medicamentos',
-            Debe: subtotal,
+            Debe: parseFloat(subtotal.toFixed(2)),
             Haber: 0
         });
-        
+        //SEGUNDO : IVA (DEBE)
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
             Descripción: descripcion,
             Cuenta: 'IVA Crédito Fiscal',
-            Debe: iva,
+            Debe: parseFloat(iva.toFixed(2)),
             Haber: 0
         });
-        
+        //Tercero: cuentas por pagar (haber)
         hojas.diario.push({
             Fecha: formatearFecha(new Date(datos.fecha)),
             Num_Asiento: numAsiento,
             Descripción: descripcion,
             Cuenta: 'Cuentas por Pagar',
             Debe: 0,
-            Haber: total
+            Haber: parseFloat(total.toFixed(2))
         });
         
         console.log('✅ Compra registrada exitosamente');
-        
+        console.log(`📊 Asientos generados:
+        DEBE Inventario: ${subtotal.toFixed(2)}
+        DEBE IVA: ${iva.toFixed(2)}
+        HABER Cuentas por Pagar: ${total.toFixed(2)}
+        ✅ Balance: ${(subtotal + iva).toFixed(2)} = ${total.toFixed(2)}`);
         if (typeof recalcAll === 'function') recalcAll();
         if (typeof actualizarLibroMayor === 'function') actualizarLibroMayor();
         if (typeof guardarExcel === 'function') guardarExcel();
@@ -427,6 +568,8 @@ function registrarCompra() {
               `Lote: ${nuevoLote.ID_Lote}\n` +
               `Medicamento: ${medicamento.Nombre}\n` +
               `Cantidad: ${formatearNumero(datos.cantidad)} unidades\n` +
+            `Subtotal: ${formatearDinero(subtotal)}\n` +
+              `IVA (4%): ${formatearDinero(iva)}\n` +
               `Total: ${formatearDinero(total)}\n\n` +
               `Se generaron 3 asientos contables.`);
         
