@@ -7,11 +7,12 @@
 // ============================================
 
 // ============================================
-// 1️⃣ BALANCE DE COMPROBACIÓN
+// 1️⃣ BALANCE DE COMPROBACIÓN (CORREGIDO)
 // ============================================
 function verBalanceComprobacion() {
     console.log('📊 Generando Balance de Comprobación...');
-    
+
+    // Validar existencia del libro diario
     if (!hojas.diario || hojas.diario.length === 0) {
         document.getElementById('contenidoDinamico').innerHTML = `
             <div class="reporte-detalle">
@@ -22,50 +23,41 @@ function verBalanceComprobacion() {
         `;
         return;
     }
-    
-    // Agrupar por cuenta
+
+    // Agrupar movimientos por cuenta
     const cuentas = {};
-    
     hojas.diario.forEach(asiento => {
         const cuenta = asiento.Cuenta?.trim() || 'Sin especificar';
-        
         if (!cuentas[cuenta]) {
-            cuentas[cuenta] = {
-                debe: 0,
-                haber: 0
-            };
+            cuentas[cuenta] = { debe: 0, haber: 0 };
         }
-        
         cuentas[cuenta].debe += parseFloat(asiento.Debe) || 0;
         cuentas[cuenta].haber += parseFloat(asiento.Haber) || 0;
     });
-    
-    // Calcular saldos
-    const datosBalance = Object.keys(cuentas).sort().map(nombreCuenta => {
-        const debe = cuentas[nombreCuenta].debe;
-        const haber = cuentas[nombreCuenta].haber;
-        const diferencia = debe - haber;
-        
+
+    // Calcular saldos y naturaleza
+    const datosBalance = Object.keys(cuentas).map(nombre => {
+        const cuenta = cuentas[nombre];
+        const saldo = cuenta.debe - cuenta.haber;
         return {
-            cuenta: nombreCuenta,
-            debe: debe,
-            haber: haber,
-            saldoDeudor: diferencia > 0 ? diferencia : 0,
-            saldoAcreedor: diferencia < 0 ? Math.abs(diferencia) : 0
+            cuenta: nombre,
+            debe: cuenta.debe,
+            haber: cuenta.haber,
+            saldoDeudor: saldo > 0 ? saldo : 0,
+            saldoAcreedor: saldo < 0 ? Math.abs(saldo) : 0
         };
     });
-    
-    // Calcular totales
+
+    // Totales
     const totalDebe = datosBalance.reduce((sum, c) => sum + c.debe, 0);
     const totalHaber = datosBalance.reduce((sum, c) => sum + c.haber, 0);
     const totalSaldoDeudor = datosBalance.reduce((sum, c) => sum + c.saldoDeudor, 0);
     const totalSaldoAcreedor = datosBalance.reduce((sum, c) => sum + c.saldoAcreedor, 0);
-    
-    // Verificar balance
-    const balanceadoDH = Math.abs(totalDebe - totalHaber) < 0.01;
-    const balanceadoSaldos = Math.abs(totalSaldoDeudor - totalSaldoAcreedor) < 0.01;
-    const estaBalanceado = balanceadoDH && balanceadoSaldos;
-    
+
+    // Verificación
+    const estaBalanceado = Math.abs(totalDebe - totalHaber) < 0.01 &&
+                           Math.abs(totalSaldoDeudor - totalSaldoAcreedor) < 0.01;
+
     // Generar HTML
     let html = `
         <div class="reporte-contable">
@@ -74,42 +66,34 @@ function verBalanceComprobacion() {
                 <p><strong>Ministerio de Salud de El Salvador</strong></p>
                 <p>Al ${new Date().toLocaleDateString('es-SV', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
             </div>
-            
-            <!-- Indicador de Balance -->
+
             <div style="background:${estaBalanceado ? '#d4edda' : '#f8d7da'}; 
                         border:2px solid ${estaBalanceado ? '#28a745' : '#dc3545'}; 
-                        border-radius:10px; 
-                        padding:20px; 
-                        margin:20px 0; 
-                        text-align:center;">
+                        border-radius:10px; padding:20px; margin:20px 0; text-align:center;">
                 <h3 style="margin:0; color:${estaBalanceado ? '#155724' : '#721c24'};">
                     ${estaBalanceado ? '✅ CONTABILIDAD BALANCEADA' : '⚠️ CONTABILIDAD DESBALANCEADA'}
                 </h3>
-                ${!estaBalanceado ? `
-                    <p style="margin:10px 0 0 0; color:#721c24;">
-                        Se detectaron inconsistencias. Revisar asientos contables.
-                    </p>
-                ` : ''}
+                ${!estaBalanceado ? '<p>Revisar asientos contables.</p>' : ''}
             </div>
-            
+
             <table class="tabla-contable">
                 <thead>
                     <tr>
-                        <th style="text-align:left; width:35%;">CUENTA</th>
-                        <th style="text-align:right; width:15%;">DEBE</th>
-                        <th style="text-align:right; width:15%;">HABER</th>
-                        <th style="text-align:right; width:17.5%;">SALDO DEUDOR</th>
-                        <th style="text-align:right; width:17.5%;">SALDO ACREEDOR</th>
+                        <th style="text-align:left;">CUENTA</th>
+                        <th style="text-align:right;">DEBE</th>
+                        <th style="text-align:right;">HABER</th>
+                        <th style="text-align:right;">SALDO DEUDOR</th>
+                        <th style="text-align:right;">SALDO ACREEDOR</th>
                     </tr>
                 </thead>
                 <tbody>
     `;
-    
-    // Renderizar cada cuenta
+
+    // Renderizar filas
     datosBalance.forEach(cuenta => {
         html += `
             <tr>
-                <td style="text-align:left;"><strong>${cuenta.cuenta}</strong></td>
+                <td style="text-align:left;">${cuenta.cuenta}</td>
                 <td style="text-align:right;">${formatearDinero(cuenta.debe)}</td>
                 <td style="text-align:right;">${formatearDinero(cuenta.haber)}</td>
                 <td style="text-align:right;">${cuenta.saldoDeudor > 0 ? formatearDinero(cuenta.saldoDeudor) : '—'}</td>
@@ -117,12 +101,12 @@ function verBalanceComprobacion() {
             </tr>
         `;
     });
-    
+
     // Totales
     html += `
                 </tbody>
                 <tfoot>
-                    <tr style="background:#667eea; color:white; font-weight:bold; font-size:1.1em;">
+                    <tr style="background:#667eea; color:white; font-weight:bold;">
                         <td style="text-align:left;">TOTALES</td>
                         <td style="text-align:right;">${formatearDinero(totalDebe)}</td>
                         <td style="text-align:right;">${formatearDinero(totalHaber)}</td>
@@ -131,21 +115,17 @@ function verBalanceComprobacion() {
                     </tr>
                 </tfoot>
             </table>
-            
-            <!-- Notas explicativas -->
+
             <div style="background:#e3f2fd; padding:20px; border-radius:8px; margin-top:30px;">
-                <h4>📌 Interpretación del Balance de Comprobación:</h4>
+                <h4>📌 Interpretación:</h4>
                 <ul>
-                    <li><strong>Debe = Haber:</strong> ${balanceadoDH ? '✅ Correcto' : '❌ Descuadrado'} 
-                        (${formatearDinero(totalDebe)} = ${formatearDinero(totalHaber)})</li>
-                    <li><strong>Saldo Deudor = Saldo Acreedor:</strong> ${balanceadoSaldos ? '✅ Correcto' : '❌ Descuadrado'} 
-                        (${formatearDinero(totalSaldoDeudor)} = ${formatearDinero(totalSaldoAcreedor)})</li>
+                    <li><strong>Debe = Haber:</strong> ${Math.abs(totalDebe - totalHaber) < 0.01 ? '✅ Correcto' : '❌ Error'}</li>
+                    <li><strong>Saldos Deudor = Acreedor:</strong> ${Math.abs(totalSaldoDeudor - totalSaldoAcreedor) < 0.01 ? '✅ Correcto' : '❌ Error'}</li>
                     <li><strong>Total de cuentas:</strong> ${datosBalance.length}</li>
                 </ul>
-                <p style="margin-top:15px;"><strong>💡 Nota:</strong> El Balance de Comprobación verifica que 
-                los registros contables estén matemáticamente correctos antes de generar estados financieros.</p>
+                <p><strong>💡 Nota:</strong> El Balance de Comprobación valida que la contabilidad esté cuadrada antes de generar estados financieros.</p>
             </div>
-            
+
             <div style="text-align:center; margin-top:30px;">
                 <button onclick="verReportesContables()">← Volver a Reportes Contables</button>
                 <button class="btn-success" onclick="exportarBalanceComprobacion()">📥 Exportar Excel</button>
@@ -153,10 +133,9 @@ function verBalanceComprobacion() {
             </div>
         </div>
     `;
-    
+
     document.getElementById('contenidoDinamico').innerHTML = html;
 }
-
 // ============================================
 // 2️⃣ BALANCE GENERAL (Estado de Situación Financiera)
 // ============================================
@@ -206,8 +185,14 @@ function verBalanceGeneral() {
     const totalActivos = Object.values(activos).reduce((sum, val) => sum + (val > 0 ? val : 0), 0);
     const totalPasivos = Object.values(pasivos).reduce((sum, val) => sum + (val > 0 ? val : 0), 0);
     const totalCostos = Object.values(costos).reduce((sum, val) => sum + val, 0);
+    //Incluir ingresos del gobierno (fondos recibidos)
+    const ingresosGobierno=Math.abs(saldos['Transferencias del Gobierno']||0);
+
+
+
+    //Calcular resultado del ejercicio y patrimonio total
     const resultadoEjercicio = -totalCostos; // Negativo porque son costos
-    const totalPatrimonio = resultadoEjercicio;
+    const totalPatrimonio = ingresosGobierno+resultadoEjercicio;
     const totalPasivosPatrimonio = totalPasivos + totalPatrimonio;
     
     const estaBalanceado = Math.abs(totalActivos - totalPasivosPatrimonio) < 1;
@@ -299,6 +284,13 @@ function verBalanceGeneral() {
                         </td>
                     </tr>
                     <tr>
+                        <td style="padding-left:50px;">Transferencias del Gobierno</td>
+                        <td style="text-align:right; color:green; font-weight:bold;">
+                            ${formatearDinero(ingresosGobierno)}
+                        </td>
+                    </tr>
+
+                    <tr>
                         <td style="padding-left:50px;">Resultado del Ejercicio</td>
                         <td style="text-align:right; ${resultadoEjercicio < 0 ? 'color:red;' : 'color:green;'} font-weight:bold;">
                             ${formatearDinero(resultadoEjercicio)}
@@ -378,7 +370,7 @@ function verEstadoResultados() {
         return;
     }
     
-    // Calcular saldos
+    // Calcular saldos por cuenta 
     const saldos = {};
     
     hojas.diario.forEach(asiento => {
@@ -386,12 +378,17 @@ function verEstadoResultados() {
         if (!saldos[cuenta]) saldos[cuenta] = 0;
         saldos[cuenta] += (parseFloat(asiento.Debe) || 0) - (parseFloat(asiento.Haber) || 0);
     });
+
     
     // Clasificar ingresos y gastos
+
+    //Ingresos operacionales y no operacionales 
     const ingresos = {
         'Ingresos por Servicios': Math.abs(saldos['Ingresos por Servicios'] || 0),
-        'Otros Ingresos': Math.abs(saldos['Otros Ingresos'] || 0)
+        'Otros Ingresos': Math.abs(saldos['Otros Ingresos'] || 0),
+        'Transferencias del Gobierno': Math.abs(saldos['transferencias del Gobierno']||0) //NUEVO
     };
+    //Costos y gastos 
     
     const costosGastos = {
         'Costo de Medicamentos Despachados': saldos['Costo de Medicamentos Despachados'] || 0,

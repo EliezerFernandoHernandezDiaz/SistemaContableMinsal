@@ -54,6 +54,13 @@ function formatearDinero(monto) {
 // ============================================
 function mostrarDashboard() {
     console.log('📊 Generando dashboard...');
+
+      // 🔄 Recalcular saldo bancario real desde el Libro Diario
+    if (hojas.diario && hojas.diario.length > 0) {
+        saldoBanco = hojas.diario
+            .filter(a => a.Cuenta === 'Bancos')
+            .reduce((sum, a) => sum + (parseFloat(a.Debe) || 0) - (parseFloat(a.Haber) || 0), 0);
+    }
     
     // Calcular métricas
     const totalMedicamentos = hojas.catalogo.length;
@@ -80,6 +87,11 @@ function mostrarDashboard() {
             <h4>Compras Registradas</h4>
            <p class="valor">${formatearNumero(totalCompras)}</p>
         </div>
+        <div class="metrica">
+    <h4>💰 Saldo en Bancos</h4>
+    <p class="valor">${formatearDinero(saldoBanco)}</p>
+        </div>
+
     `;
     
     document.getElementById('metricas').innerHTML = html;

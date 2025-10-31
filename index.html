@@ -51,7 +51,20 @@
                 <button onclick="verLibroDiario()">📖 Ver Libro Diario</button>
                  <button onclick="verLibroMayor()">📗 Ver Libro Mayor</button>  
                 <button onclick= "verReportes()"> Reportes</button>
+                <button onclick="verKardex()">Ver Kardex por Medicamentos</button>
                 <button onclick="guardarExcel()" class="btn-success">💾 Guardar Excel Actualizado</button>
+                <button onclick="inicializarPresupuesto()" 
+                   style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                💰 Recibir Presupuesto del Gobierno
+                </button>
+                <button onclick="verPagosProveedores()" 
+                        style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                    💳 Pagar a Proveedores
+                </button>
+
+                <button onclick="verEstadoCuentaBancaria()">
+                    🏦 Estado de Cuenta Bancaria
+                </button>
                 </button>
 
             </div>
@@ -72,5 +85,7 @@
     <script src="js/salidas.js"></script>
     <script src="js/reportes.js"></script>
     <script src="js/reportes-contables.js"></script>
+    <script src="js/kardex.js"></script>
+    <script src="js/pagos.js"></script>
 </body>
 </html>
